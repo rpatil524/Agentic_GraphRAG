@@ -33,7 +33,7 @@ The knowledge graph is built through a three-phase ingestion pipeline designed f
 This design separates deterministic ingestion from probabilistic extraction, then resolves both layers in-database with Cypher cleanup. The result is a deduplicated Neo4j graph optimized for multi-hop traversal, temporal analysis, and reliable entity disambiguation.
 
 <!-- FIGURE PLACEHOLDER: Data Pipeline (replace with your paper figure path) -->
-![Data ingestion pipeline figure placeholder](./docs/figures/data_pipeline_placeholder.png)
+![Data ingestion pipeline figure placeholder](./docs/figures/data_pipeline.png)
 
 ### Analytical Agent Architecture
 
@@ -42,7 +42,7 @@ The agent is implemented as a controlled three-stage architecture. First, a zero
 This separation of routing, tool execution, and synthesis improves reliability and auditability in expert workflows. It prevents uncontrolled query behavior, enforces read-only safety constraints for custom Cypher, and keeps the final response grounded in an explicit execution trajectory visible in the dashboard.
 
 <!-- FIGURE PLACEHOLDER: Agent Architecture (replace with your paper figure path) -->
-![Analytical agent architecture figure placeholder](./docs/figures/agent_architecture_placeholder.png)
+![Analytical agent architecture figure placeholder](./docs/figures/agent_architecture.png)
 
 ## 1) System Requirements
 
