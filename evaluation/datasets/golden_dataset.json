@@ -1,0 +1,473 @@
+[
+    {
+        "tier": "Level 1: Head Office",
+        "category": "Easy",
+        "raw_answer": "The registered address of Sporloisirs SA is rue de Cornavin 6, 1201.0 Gen\u00e8ve.",
+        "question": "What is the registered address or base of Sporloisirs SA?",
+        "answer": "The registered address of Sporloisirs SA is rue de Cornavin 6, 1201 Gen\u00e8ve.",
+        "question_id": "HQ001"
+    },
+    {
+        "tier": "Level 1: Dissolution Notices",
+        "category": "Easy",
+        "raw_answer": "Yes, a dissolution or bankruptcy notice for MUJI HAUSWARTUNGEN was published on 2022-12-08 00:00:00+00:00.",
+        "question": "Have any notices of dissolution or bankruptcy been published for MUJI HAUSWARTUNGEN?",
+        "answer": "Yes, a notice of dissolution for MUJI HAUSWARTUNGEN was published on December 8, 2022.",
+        "question_id": "HQ003"
+    },
+    {
+        "tier": "Level 1: Head Office",
+        "category": "Easy",
+        "raw_answer": "The registered address of AluConcept Holding SA is Klingental 5, 4058.0 Basel.",
+        "question": "What is the registered address or base of AluConcept Holding SA?",
+        "answer": "The registered address of AluConcept Holding SA is Klingental 5, 4058 Basel.",
+        "question_id": "HQ008"
+    },
+    {
+        "tier": "Level 1: Dissolution Notices",
+        "category": "Easy",
+        "raw_answer": "Yes, a dissolution or bankruptcy notice for LifeTime AG was published on 2023-03-06 00:00:00+00:00.",
+        "question": "Have any notices of dissolution or bankruptcy been published for LifeTime AG?",
+        "answer": "Yes, a notice of dissolution for LifeTime AG was published on March 6, 2023.",
+        "question_id": "HQ011"
+    },
+    {
+        "tier": "Level 1: Head Office",
+        "category": "Easy",
+        "raw_answer": "The registered address of VISTON AG is Sch\u00fctzenstrasse 38O, 9100.0 Herisau.",
+        "question": "What is the registered address or base of VISTON AG?",
+        "answer": "The registered address of VISTON AG is Sch\u00fctzenstrasse 38O, 9100 Herisau.",
+        "question_id": "HQ012"
+    },
+    {
+        "tier": "Level 1: Dissolution Notices",
+        "category": "Easy",
+        "raw_answer": "Yes, a dissolution or bankruptcy notice for Logo GmbH in Liquidation was published on 2023-04-05 00:00:00+00:00.",
+        "question": "Have any notices of dissolution or bankruptcy been published for Logo GmbH in Liquidation?",
+        "answer": "Yes, a notice of dissolution for Logo GmbH in Liquidation was published on April 5, 2023.",
+        "question_id": "HQ016"
+    },
+    {
+        "tier": "Level 1: Dissolution Notices",
+        "category": "Easy",
+        "raw_answer": "Yes, a dissolution or bankruptcy notice for MKN Concept.com Tacan was published on 2020-12-08 00:00:00+00:00.",
+        "question": "Have any notices of dissolution or bankruptcy been published for MKN Concept.com Tacan?",
+        "answer": "Yes, a notice of dissolution for MKN Concept.com Tacan was published on December 8, 2020.",
+        "question_id": "HQ019"
+    },
+    {
+        "tier": "Level 1: Head Office",
+        "category": "Easy",
+        "raw_answer": "The registered address of BS Facility S\u00e0rl is Avenue du Tir-F\u00e9d\u00e9ral 34, 1024.0 Ecublens (VD).",
+        "question": "What is the registered address or base of BS Facility S\u00e0rl?",
+        "answer": "The registered address of BS Facility S\u00e0rl is Avenue du Tir-F\u00e9d\u00e9ral 34, 1024 Ecublens (VD).",
+        "question_id": "HQ025"
+    },
+    {
+        "tier": "Level 1: Head Office",
+        "category": "Easy",
+        "raw_answer": "The registered address of Vieser Executive Search AG is Hochbergerstr. 70, 4057.0 Basel.",
+        "question": "What is the registered address or base of Vieser Executive Search AG?",
+        "answer": "The registered address of Vieser Executive Search AG is Hochbergerstr. 70, 4057 Basel.",
+        "question_id": "HQ028"
+    },
+    {
+        "tier": "Level 1: Head Office",
+        "category": "Easy",
+        "raw_answer": "The registered address of Swiss Bau Ausschalung GmbH in Liquidation is Glarnerstrasse 39, 8854.0 Sch\u00fcbelbach.",
+        "question": "What is the registered address or base of Swiss Bau Ausschalung GmbH in Liquidation?",
+        "answer": "The registered address of Swiss Bau Ausschalung GmbH in Liquidation is Glarnerstrasse 39, 8854 Sch\u00fcbelbach.",
+        "question_id": "HQ031"
+    },
+    {
+        "tier": "Level 1: Dissolution Date",
+        "category": "Easy",
+        "raw_answer": "A dissolution or bankruptcy notice for pp software perfect processes gmbh was published on 2019-11-22 00:00:00+00:00.",
+        "question": "When was a dissolution or bankruptcy notice published for pp software perfect processes gmbh?",
+        "answer": "A dissolution or bankruptcy notice for pp software perfect processes gmbh was published on November 22, 2019.",
+        "question_id": "HQ035"
+    },
+    {
+        "tier": "Level 2: Shared Activities",
+        "category": "Hard",
+        "raw_answer": "Jennifer Eva Meyer shares activities with: Michael Jonas Meyer, Martin Meyer",
+        "question": "With whom does Jennifer Eva Meyer share an activity?",
+        "answer": "Jennifer Eva Meyer shares activities with Michael Jonas Meyer and Martin Meyer.",
+        "question_id": "HQ045"
+    },
+    {
+        "tier": "Level 1: Dissolution Date",
+        "category": "Easy",
+        "raw_answer": "A dissolution or bankruptcy notice for GART AG in Liquidation was published on 2024-11-20 00:00:00+00:00.",
+        "question": "When was a dissolution or bankruptcy notice published for GART AG in Liquidation?",
+        "answer": "A dissolution or bankruptcy notice for GART AG in Liquidation was published on November 20, 2024.",
+        "question_id": "HQ047"
+    },
+    {
+        "tier": "Level 2: Shared Activities",
+        "category": "Hard",
+        "raw_answer": "Jourdain Mathieu shares activities with: Jourdain Vincent, Andr\u00e9 Martin",
+        "question": "With whom does Jourdain Mathieu share an activity?",
+        "answer": "Jourdain Mathieu shares activities with Jourdain Vincent and Andr\u00e9 Martin.",
+        "question_id": "HQ048"
+    },
+    {
+        "tier": "Level 1: Dissolution Date",
+        "category": "Easy",
+        "raw_answer": "A dissolution or bankruptcy notice for Soci\u00e9t\u00e9 Coop\u00e9rative Philea International was published on 2024-04-22 00:00:00+00:00.",
+        "question": "When was a dissolution or bankruptcy notice published for Soci\u00e9t\u00e9 Coop\u00e9rative Philea International?",
+        "answer": "A dissolution or bankruptcy notice for Soci\u00e9t\u00e9 Coop\u00e9rative Philea International was published on April 22, 2024.",
+        "question_id": "HQ051"
+    },
+    {
+        "tier": "Level 2: Shared Activities",
+        "category": "Hard",
+        "raw_answer": "Mohamed Yousfi shares activities with: G\u00e9rald Xavier Chabert, Marie-Louise Rose Norval, Emilie Point",
+        "question": "With whom does Mohamed Yousfi share an activity?",
+        "answer": "Mohamed Yousfi shares activities with G\u00e9rald Xavier Chabert, Marie-Louise Rose Norval, and Emilie Point.",
+        "question_id": "HQ053"
+    },
+    {
+        "tier": "Level 1: Dissolution Date",
+        "category": "Easy",
+        "raw_answer": "A dissolution or bankruptcy notice for L\u00fcft-ISOL GmbH was published on 2023-09-08 00:00:00+00:00.",
+        "question": "When was a dissolution or bankruptcy notice published for L\u00fcft-ISOL GmbH?",
+        "answer": "A dissolution or bankruptcy notice for L\u00fcft-ISOL GmbH was published on September 8, 2023.",
+        "question_id": "HQ056"
+    },
+    {
+        "tier": "Level 2: Shared Activities",
+        "category": "Hard",
+        "raw_answer": "Ekrem Maloku shares activities with: Cyrill Gebert, Rocco Delli Colli",
+        "question": "With whom does Ekrem Maloku share an activity?",
+        "answer": "Ekrem Maloku shares activities with Cyrill Gebert and Rocco Delli Colli.",
+        "question_id": "HQ060"
+    },
+    {
+        "tier": "Level 1: Dissolution Date",
+        "category": "Easy",
+        "raw_answer": "A dissolution or bankruptcy notice for HOME SELECT SA was published on 2020-07-06 00:00:00+00:00.",
+        "question": "When was a dissolution or bankruptcy notice published for HOME SELECT SA?",
+        "answer": "A dissolution or bankruptcy notice for HOME SELECT SA was published on July 6, 2020.",
+        "question_id": "HQ062"
+    },
+    {
+        "tier": "Level 2: Shared Activities",
+        "category": "Hard",
+        "raw_answer": "Vivien Wassermann shares activities with: Albert Wassermann",
+        "question": "With whom does Vivien Wassermann share an activity?",
+        "answer": "Vivien Wassermann shares activities with Albert Wassermann.",
+        "question_id": "HQ066"
+    },
+    {
+        "tier": "Level 2: Shared Activities",
+        "category": "Hard",
+        "raw_answer": "Bernet, Jules shares activities with: Zehnder, Lukas, Markus Walther, Marco Ackermann, J\u00e9r\u00f4me Amir Ebrahimi, Luis Deplazes, Antonio Folino Ponte, Julian Reinhard, Lukas Reinhard, Niven Vural, Armin Bernet",
+        "question": "With whom does Bernet, Jules share an activity?",
+        "answer": "Bernet, Jules shares activities with Zehnder, Lukas; Markus Walther; Marco Ackermann; J\u00e9r\u00f4me Amir Ebrahimi; Luis Deplazes; Antonio Folino Ponte; Julian Reinhard; Lukas Reinhard; Niven Vural; Armin Bernet.",
+        "question_id": "HQ069"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Gabriela Frei is connected with the following companies: WF Investments Sempach AG, Behinderten Transport Fahrdienst Frei, Immo-X GmbH",
+        "question": "Show all the companies with which Gabriela Frei is connected.",
+        "answer": "Gabriela Frei is connected with the following companies: WF Investments Sempach AG, Behinderten Transport Fahrdienst Frei, Immo-X GmbH.",
+        "question_id": "HQ070"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Lejeune House-Sitting is avenue Louis-Casa\u00ef 81, 1216.0 Meyrin.",
+        "question": "What is the registered address of Lejeune House-Sitting?",
+        "answer": "The registered address of Lejeune House-Sitting is avenue Louis-Casa\u00ef 81, 1216 Meyrin.",
+        "question_id": "HQ071"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Treuhandb\u00fcro Ursula Meier is Industriestrasse 1, 6304.0 Zug.",
+        "question": "What is the registered address of Treuhandb\u00fcro Ursula Meier?",
+        "answer": "The registered address of Treuhandb\u00fcro Ursula Meier is Industriestrasse 1, 6304 Zug.",
+        "question_id": "HQ073"
+    },
+    {
+        "tier": "Level 2: Shared Activities",
+        "category": "Hard",
+        "raw_answer": "Z\u00fcrcher, Samuel shares activities with: Nicolas Berg, Alexander Urs L\u00fcthi, Simon Tim Pfister, Michael Sauter, Brandt, Derek, Daniel Ormos, David V\u00f6ge, Daniel Geiselmann, Matthias G\u00f6sser, Roland Strasser",
+        "question": "With whom does Samuel Z\u00fcrcher share an activity?",
+        "answer": "Samuel Z\u00fcrcher shares activities with Nicolas Berg, Alexander Urs L\u00fcthi, Simon Tim Pfister, Michael Sauter, Derek Brandt, Daniel Ormos, David V\u00f6ge, Daniel Geiselmann, Matthias G\u00f6sser, and Roland Strasser.",
+        "question_id": "HQ074"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Alpin Studio Stalder is Bahnhofstrasse 17, 6055.0 Alpnach.",
+        "question": "What is the registered address of Alpin Studio Stalder?",
+        "answer": "The registered address of Alpin Studio Stalder is Bahnhofstrasse 17, 6055 Alpnach.",
+        "question_id": "HQ075"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Sternen Weissenburg GmbH is ,.",
+        "question": "What is the registered address of Sternen Weissenburg GmbH?",
+        "answer": "The registered address of Sternen Weissenburg GmbH is not provided.",
+        "question_id": "HQ076"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Bader, Fabian is connected with the following companies: Realba AG, CRAFF AG, BCT Holding AG",
+        "question": "Show all the companies with which Bader, Fabian is connected.",
+        "answer": "Bader, Fabian is connected with the following companies: Realba AG, CRAFF AG, BCT Holding AG.",
+        "question_id": "HQ078"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Yanic Besson is connected with the following companies: Liquid Network GmbH, Besson IT Solutions",
+        "question": "Show all the companies with which Yanic Besson is connected.",
+        "answer": "Yanic Besson is connected with the following companies: Liquid Network GmbH, Besson IT Solutions.",
+        "question_id": "HQ079"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Silvio Waldmeier is connected with the following companies: Material Upcycling AG, AM Powder AG",
+        "question": "Show all the companies with which Silvio Waldmeier is connected.",
+        "answer": "Silvio Waldmeier is connected with Material Upcycling AG and AM Powder AG.",
+        "question_id": "HQ081"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Zuri AG is Industrie Neuhof 4b, 3422.0 Kirchberg (BE).",
+        "question": "What is the registered address of Zuri AG?",
+        "answer": "The registered address of Zuri AG is Industrie Neuhof 4b, 3422 Kirchberg (BE).",
+        "question_id": "HQ082"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Geo Science SA is Galerieweg 11, 9443.0 Widnau.",
+        "question": "What is the registered address of Geo Science SA?",
+        "answer": "The registered address of Geo Science SA is Galerieweg 11, 9443 Widnau.",
+        "question_id": "HQ084"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Roman Eicher is connected with the following companies: Casa La Val Roman Eicher, Tgesa Strem GmbH",
+        "question": "Show all the companies with which Roman Eicher is connected.",
+        "answer": "Roman Eicher is connected with the following companies: Casa La Val Roman Eicher, Tgesa Strem GmbH.",
+        "question_id": "HQ085"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Baltic Golf Tours by Peter Wyss is Milchbrunnenstrasse 25, 6370.0 Stans.",
+        "question": "What is the registered address of Baltic Golf Tours by Peter Wyss?",
+        "answer": "The registered address of Baltic Golf Tours by Peter Wyss is Milchbrunnenstrasse 25, 6370 Stans.",
+        "question_id": "HQ087"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "G\u00e9rald Carron is connected with the following companies: G\u00e9rald Carron, G\u00e9rald Carron S\u00e0rl",
+        "question": "Show all the companies with which G\u00e9rald Carron is connected.",
+        "answer": "G\u00e9rald Carron is connected with the following companies: G\u00e9rald Carron, G\u00e9rald Carron S\u00e0rl.",
+        "question_id": "HQ088"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Semmens Guy is connected with the following companies: DSS Sustainable Solutions Switzerland SA, Essential Pharma Switzerland GmbH, Mountain Top SA, Gyrus Capital SA",
+        "question": "Show all the companies with which Semmens Guy is connected.",
+        "answer": "Semmens Guy is connected with the following companies: DSS Sustainable Solutions Switzerland SA, Essential Pharma Switzerland GmbH, Mountain Top SA, Gyrus Capital SA.",
+        "question_id": "HQ089"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Corina Hartmann is connected with the following companies: Hartmann Lohnunternehmen, Beauty Center Hartmann",
+        "question": "Show all the companies with which Corina Hartmann is connected.",
+        "answer": "Corina Hartmann is connected with the following companies: Hartmann Lohnunternehmen, Beauty Center Hartmann.",
+        "question_id": "HQ090"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Gajur Jakupi is connected with the following companies: Malergesch\u00e4ft Jakupi, Gipser und Maler Jakupi",
+        "question": "Show all the companies with which Gajur Jakupi is connected.",
+        "answer": "Gajur Jakupi is connected with the following companies: Malergesch\u00e4ft Jakupi, Gipser und Maler Jakupi.",
+        "question_id": "HQ091"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Sulaiman Grill is Stebligerweg 7, 4450.0 Sissach.",
+        "question": "What is the registered address of Sulaiman Grill?",
+        "answer": "The registered address of Sulaiman Grill is Stebligerweg 7, 4450 Sissach.",
+        "question_id": "HQ093"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of AZAL AG in Liquidation is Waaggasse 5, 8001.0 Z\u00fcrich.",
+        "question": "What is the registered address of AZAL AG in Liquidation?",
+        "answer": "The registered address of AZAL AG in Liquidation is Waaggasse 5, 8001 Z\u00fcrich.",
+        "question_id": "HQ094"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Histoire & Voyages S.\u00e0 r.l. is Rue William-Haldimand 11, 1003.0 Lausanne.",
+        "question": "What is the registered address of Histoire & Voyages S.\u00e0 r.l.?",
+        "answer": "The registered address of Histoire & Voyages S.\u00e0 r.l. is Rue William-Haldimand 11, 1003 Lausanne.",
+        "question_id": "HQ095"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of AROS INVESTMENT SAGL is Viale Alessandro Volta 1, 6830.0 Chiasso.",
+        "question": "What is the registered address of AROS INVESTMENT SAGL?",
+        "answer": "The registered address of AROS INVESTMENT SAGL is Viale Alessandro Volta 1, 6830 Chiasso.",
+        "question_id": "HQ101"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Numisworld S\u00e0rl is Rue des Bonnes Luites 75, 1920.0 Martigny.",
+        "question": "What is the registered address of Numisworld S\u00e0rl?",
+        "answer": "The registered address of Numisworld S\u00e0rl is Rue des Bonnes Luites 75, 1920 Martigny.",
+        "question_id": "HQ103"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Zineb Hattab Laoulidi is connected with the following companies: Dora Projects AG, Plant-based Group AG, ZH Projects GmbH",
+        "question": "Show all the companies with which Zineb Hattab Laoulidi is connected.",
+        "answer": "Zineb Hattab Laoulidi is connected with the following companies: Dora Projects AG, Plant-based Group AG, ZH Projects GmbH.",
+        "question_id": "HQ104"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Suter J\u00fcrg is connected with the following companies: Oscar Services GmbH, Suter Carsharing AG, HUBCOM GmbH",
+        "question": "Show all the companies with which Suter J\u00fcrg is connected.",
+        "answer": "Suter J\u00fcrg is connected with the following companies: Oscar Services GmbH, Suter Carsharing AG, HUBCOM GmbH.",
+        "question_id": "HQ105"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Rosetta Marita Di Ponziano is connected with the following companies: Stark Consulting & Investment di Rosetta Marita Di Ponziano, Dao International di Rosetta Marita Di Ponziano",
+        "question": "Show all the companies with which Rosetta Marita Di Ponziano is connected.",
+        "answer": "Rosetta Marita Di Ponziano is connected with the following companies: Stark Consulting & Investment di Rosetta Marita Di Ponziano, Dao International di Rosetta Marita Di Ponziano.",
+        "question_id": "HQ106"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Ouray Holdings I AG in Liquidation is Grepperstrasse 45B, 6403.0 K\u00fcssnacht (SZ).",
+        "question": "What is the registered address of Ouray Holdings I AG in Liquidation?",
+        "answer": "The registered address of Ouray Holdings I AG in Liquidation is Grepperstrasse 45B, 6403 K\u00fcssnacht.",
+        "question_id": "HQ109"
+    },
+    {
+        "tier": "Level 2: Person-Company Connections",
+        "category": "Hard",
+        "raw_answer": "Churlaud Cyril is connected with the following companies: Holding CC S\u00e0rl, CYCA S\u00e0rl, CYPACH S\u00e0rl, LBTCH S\u00e0rl",
+        "question": "Show all the companies with which Churlaud Cyril is connected.",
+        "answer": "Churlaud Cyril is connected with the following companies: Holding CC S\u00e0rl, CYCA S\u00e0rl, CYPACH S\u00e0rl, LBTCH S\u00e0rl.",
+        "question_id": "HQ115"
+    },
+    {
+        "tier": "Level 1: Registered Address",
+        "category": "Easy",
+        "raw_answer": "The registered address of Swissquality Braun is Weingartenstrasse 22, 8372.0 Sirnach.",
+        "question": "What is the registered address of Swissquality Braun?",
+        "answer": "The registered address of Swissquality Braun is Weingartenstrasse 22, 8372 Sirnach.",
+        "question_id": "HQ116"
+    },
+    {
+        "tier": "Level 1: Dissolution Notices",
+        "category": "Easy",
+        "raw_answer": "Yes, a dissolution or bankruptcy notice for Dorfkiosk und Caf\u00e9, Setz was published on 2020-12-17 00:00:00+00:00.",
+        "question": "Have any notices of dissolution or bankruptcy been published for Dorfkiosk und Caf\u00e9, Setz?",
+        "answer": "Yes, a notice of dissolution for Dorfkiosk und Caf\u00e9, Setz was published on December 17, 2020.",
+        "question_id": "HQ118"
+    },
+    {
+        "tier": "Level 1: Head Office",
+        "category": "Easy",
+        "raw_answer": "The registered address of C-Tech Finanz Holding AG in Liquidation is Baumgarten 11, 3800.0 Unterseen.",
+        "question": "What is the registered address or base of C-Tech Finanz Holding AG in Liquidation?",
+        "answer": "The registered address of C-Tech Finanz Holding AG in Liquidation is Baumgarten 11, 3800 Unterseen.",
+        "question_id": "HQ119"
+    },
+    {
+        "category": "Medium",
+        "question": "What companies are connected to conversa.gr treuhand ag?",
+        "answer": "conversa.gr treuhand ag is connected to the following companies: BergWind GmbH, MAT Immobilien AG, NLP Media GmbH",
+        "question_id": "HQ120",
+        "raw_question": "What companies are connected to conversa.gr treuhand ag?"
+    },
+    {
+        "category": "Medium",
+        "question": "What companies are connected to Fiduciaire SCHULE & KRIEGER?",
+        "answer": "Fiduciaire SCHULE & KRIEGER is connected to the following companies: Gecibat S\u00e0rl, Perrin Transports S.A., Restaurant de l'Union Avenches S\u00e0rl",
+        "question_id": "HQ121",
+        "raw_question": "What companies are connected to Fiduciaire SCHULE & KRIEGER?"
+    },
+    {
+        "category": "Medium",
+        "question": "What companies are connected to Sanitas Troesch AG?",
+        "answer": "Sanitas Troesch AG is connected to the following companies: Fischer K\u00fcchen und Haushaltger\u00e4te, Zweigniederlassung der Sanitas Troesch AG, Sanitas Troesch AG, Zweigniederlassung Lugano, Sanitas Troesch S.A., Sanitas Troesch SA",
+        "question_id": "HQ122",
+        "raw_question": "What companies are connected to Sanitas Troesch AG?"
+    },
+    {
+        "category": "Medium",
+        "question": "What companies are connected to Cortesi & Associati SA?",
+        "answer": "Cortesi & Associati SA is connected to the following companies: DAG & BAU Sagl in liquidazione, Grimoba AG, Hotel Lago di Lugano SA, Ringizia SA",
+        "question_id": "HQ123",
+        "raw_question": "What companies are connected to Cortesi & Associati SA?"
+    },
+    {
+        "category": "Medium",
+        "question": "What companies are connected to Adverta Treuhand AG?",
+        "answer": "Adverta Treuhand AG is connected to the following companies: EBMC SA, ROS Schweiz Management GmbH, Reitsport Stieger GmbH",
+        "question_id": "HQ124",
+        "raw_question": "What companies are connected to Adverta Treuhand AG?"
+    },
+    {
+        "category": "Medium",
+        "question": "What companies are connected to B&B Concept AG?",
+        "answer": "B&B Concept AG is connected to the following companies: Adieu GmbH, Garage Muntwyler AG, Joyce McInnis Production GmbH",
+        "question_id": "HQ125",
+        "raw_question": "What companies are connected to B&B Concept AG?"
+    },
+    {
+        "category": "Medium",
+        "question": "What companies are connected to Amida Treuhand GmbH?",
+        "answer": "Amida Treuhand GmbH is connected to the following companies: Die B\u00fcchermacher GmbH, Ingenieurb\u00fcro Andr\u00e9 Deubelbeiss GmbH, Linsi + Deubelbeiss Ingenieurunternehmung GmbH",
+        "question_id": "HQ126",
+        "raw_question": "What companies are connected to Amida Treuhand GmbH?"
+    },
+    {
+        "category": "Medium",
+        "question": "What companies are connected to Schweizer Milchproduzenten SMP Genossenschaft?",
+        "answer": "Schweizer Milchproduzenten SMP Genossenschaft is connected to the following companies: Cremo S.A., Floralp Butter GmbH, Fuchs + Co. AG, Mittelland Molkerei AG",
+        "question_id": "HQ127",
+        "raw_question": "What companies are connected to Schweizer Milchproduzenten SMP Genossenschaft?"
+    },
+    {
+        "category": "Medium",
+        "question": "What companies are connected to Chappuis Restaurants S\u00e0rl?",
+        "answer": "Chappuis Restaurants S\u00e0rl is connected to the following companies: Chappuis Restaurants S\u00e0rl, succursale de Rennaz, Chappuis Restaurants S\u00e0rl, succursale de Vevey, Chappuis Restaurants S\u00e0rl, succursale du Chablais Est, Chappuis Restaurants S\u00e0rl, succursale du Chablais Ouest",
+        "question_id": "HQ128",
+        "raw_question": "What companies are connected to Chappuis Restaurants S\u00e0rl?"
+    }
+]

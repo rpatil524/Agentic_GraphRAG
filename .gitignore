@@ -1,0 +1,19 @@
+# Keep JSON ignored by default in this package...
+*.json
+
+# ...but include the three benchmark datasets required for reproducibility.
+!evaluation/datasets/automated_dataset.json
+!evaluation/datasets/golden_dataset.json
+!evaluation/datasets/conversational_dataset.json
+
+# Common local build/runtime artifacts
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.venv/
+venv/
+frontend/node_modules/
+frontend/.next/
+evaluation/baseline_rag/chroma_db/
+

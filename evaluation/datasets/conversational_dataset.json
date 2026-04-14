@@ -1,0 +1,655 @@
+{
+    "dataset_name": "SHAB Conversational Golden Dataset",
+    "source_dataset": "evaluation/golden_dataset_human.json",
+    "total_conversations": 12,
+    "conversations": [
+        {
+            "conversation_id": "C001",
+            "scenario_type": "person_affiliations_memory",
+            "source_question_id": "HQ004",
+            "conversation_goal": "Preserve the active person and affiliated company list across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "Show all the companies with which Heinz Sommer is affiliated.",
+                    "expected_answer": "Heinz Sommer is affiliated with SMA Swiss Marketing Academy GmbH, Vantage Education AG, Swiss Prävensana Akademie AG, EnzoEstate AG, DUO Schweiz AG, and Karrierefabrik GmbH.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "entity_resolution"
+                    ],
+                    "expected_tool_behavior": [
+                        "explore_network"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "List only the company names again.",
+                    "expected_answer": "Heinz Sommer is affiliated with SMA Swiss Marketing Academy GmbH, Vantage Education AG, Swiss Prävensana Akademie AG, EnzoEstate AG, DUO Schweiz AG, and Karrierefabrik GmbH",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "compression"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "How many companies is that?",
+                    "expected_answer": "Heinz Sommer is affiliated with 6 companies.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "counting"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 4,
+                    "user_message": "Which person were we discussing?",
+                    "expected_answer": "We were discussing Heinz Sommer.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C002",
+            "scenario_type": "person_affiliations_memory",
+            "source_question_id": "HQ006",
+            "conversation_goal": "Preserve the active person and affiliated company list across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "Show all the companies with which Buchmann Virgile is affiliated.",
+                    "expected_answer": "Buchmann Virgile is affiliated with Swiss Life, Agence générale de Morges-La Côte, Virgile Buchmann, and Agent Général.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "entity_resolution"
+                    ],
+                    "expected_tool_behavior": [
+                        "explore_network"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "List only the company names again.",
+                    "expected_answer": "Swiss Life, Agence générale de Morges-La Côte, Virgile Buchmann, Agent Général.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "compression"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "How many companies is that?",
+                    "expected_answer": "Buchmann Virgile is affiliated with 4 companies.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "counting"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 4,
+                    "user_message": "Which person were we discussing?",
+                    "expected_answer": "We were discussing Buchmann Virgile.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C003",
+            "scenario_type": "person_affiliations_memory",
+            "source_question_id": "HQ007",
+            "conversation_goal": "Preserve the active person and affiliated company list across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "Show all the companies with which Amstad Lea is affiliated.",
+                    "expected_answer": "Amstad Lea is affiliated with the following companies: Crazaar, Inhaberin Amstad Lea.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "entity_resolution"
+                    ],
+                    "expected_tool_behavior": [
+                        "explore_network"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "List only the company names again.",
+                    "expected_answer": "Crazaar, Inhaberin Amstad Lea.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "compression"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "How many companies is that?",
+                    "expected_answer": "Amstad Lea is affiliated with 2 companies.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "counting"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 4,
+                    "user_message": "Which person were we discussing?",
+                    "expected_answer": "We were discussing Amstad Lea.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C004",
+            "scenario_type": "company_connections_memory",
+            "source_question_id": "HQ001",
+            "conversation_goal": "Preserve the active company and connected-company list across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "What companies are connected to E.W.A.- Coaching GmbH?",
+                    "expected_answer": "E.W.A.- Coaching GmbH is connected to E.W.A.-Coaching GmbH.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "relationship_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "explore_network"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "List only the connected company names.",
+                    "expected_answer": "E.W.A.-Coaching GmbH.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "compression"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "How many connected companies is that?",
+                    "expected_answer": "E.W.A.- Coaching GmbH is connected to 1 company.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "counting"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 4,
+                    "user_message": "Which company were we investigating?",
+                    "expected_answer": "We were investigating E.W.A.- Coaching GmbH.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C005",
+            "scenario_type": "company_connections_memory",
+            "source_question_id": "HQ002",
+            "conversation_goal": "Preserve the active company and connected-company list across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "What companies are connected to BauSpektrum AG?",
+                    "expected_answer": "BauSpektrum AG is connected to BauSpektrum AG Münsingen, BauSpektrum Management AG, Bauspektrum AG.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "relationship_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "explore_network"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "List only the connected company names.",
+                    "expected_answer": "BauSpektrum AG Münsingen, BauSpektrum Management AG, Bauspektrum AG.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "compression"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "How many connected companies is that?",
+                    "expected_answer": "BauSpektrum AG is connected to 3 companies.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "counting"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 4,
+                    "user_message": "Which company were we investigating?",
+                    "expected_answer": "We were investigating BauSpektrum AG.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C006",
+            "scenario_type": "company_connections_memory",
+            "source_question_id": "HQ005",
+            "conversation_goal": "Preserve the active company and connected-company list across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "What companies are connected to Kochwerkstatt GmbH?",
+                    "expected_answer": "Kochwerkstatt GmbH is connected to Kochwerkstatt GmbH in Liquidation and PEDOMA Treuhand AG.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "relationship_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "explore_network"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "List only the connected company names.",
+                    "expected_answer": "Kochwerkstatt GmbH in Liquidation, PEDOMA Treuhand AG.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "compression"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "How many connected companies is that?",
+                    "expected_answer": "Kochwerkstatt GmbH is connected to 2 companies.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "counting"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 4,
+                    "user_message": "Which company were we investigating?",
+                    "expected_answer": "We were investigating Kochwerkstatt GmbH.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C007",
+            "scenario_type": "location_memory",
+            "source_question_id": "HQ003",
+            "conversation_goal": "Preserve the active company and recovered location across short follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "What is the registered head office or base of Atlas Automobiles SA?",
+                    "expected_answer": "The registered head office of Atlas Automobiles SA is in Martigny.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "location_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "search_companies",
+                        "get_node_history"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "Just give me the city.",
+                    "expected_answer": "Martigny.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "compression"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "Which company was that for?",
+                    "expected_answer": "That was for Atlas Automobiles SA.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C008",
+            "scenario_type": "location_memory",
+            "source_question_id": "HQ008",
+            "conversation_goal": "Preserve the active company and recovered location across short follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "What is the registered head office or base of Hochitrans Express-Logistik GmbH?",
+                    "expected_answer": "The registered head office of Hochitrans Express-Logistik GmbH is in Tübach.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "location_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "search_companies",
+                        "get_node_history"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "Just give me the city.",
+                    "expected_answer": "Tübach.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "compression"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "Which company was that for?",
+                    "expected_answer": "That was for Hochitrans Express-Logistik GmbH.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C009",
+            "scenario_type": "dissolution_memory",
+            "source_question_id": "HQ054",
+            "conversation_goal": "Preserve the active company and dissolution date across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "Have any notices of dissolution or bankruptcy been published for S2 Management + Consulting GmbH?",
+                    "expected_answer": "Yes, S2 Management + Consulting GmbH was dissolved on November 3, 2022.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "temporal_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "search_companies",
+                        "get_node_history"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "On what date exactly?",
+                    "expected_answer": "It was dissolved on November 3, 2022.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "temporal_memory"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "Which company are we talking about?",
+                    "expected_answer": "We are talking about S2 Management + Consulting GmbH.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C010",
+            "scenario_type": "dissolution_memory",
+            "source_question_id": "HQ057",
+            "conversation_goal": "Preserve the active company and dissolution date across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "Have any notices of dissolution or bankruptcy been published for Binz Concept Store GmbH?",
+                    "expected_answer": "Yes, Binz Concept Store GmbH was dissolved on March 1, 2024.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "temporal_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "search_companies",
+                        "get_node_history"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "On what date exactly?",
+                    "expected_answer": "It was dissolved on March 1, 2024.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "temporal_memory"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "Which company are we talking about?",
+                    "expected_answer": "We are talking about Binz Concept Store GmbH.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C011",
+            "scenario_type": "shared_activities_memory",
+            "source_question_id": "HQ044",
+            "conversation_goal": "Preserve the active person and shared-activity names across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "With whom does Matthias Raaflaub share an activity?",
+                    "expected_answer": "Matthias Raaflaub shares activities with Sarah Clausen, Michael Rosin, Jonas Ryser, and Helen Baumann.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "relationship_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "explore_network"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "List only the names again.",
+                    "expected_answer": "Sarah Clausen, Michael Rosin, Jonas Ryser, and Helen Baumann.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "compression"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "How many people is that?",
+                    "expected_answer": "Matthias Raaflaub shares activities with 4 person.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "counting"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 4,
+                    "user_message": "Which person were we talking about?",
+                    "expected_answer": "We were talking about Matthias Raaflaub.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C012",
+            "scenario_type": "shared_activities_memory",
+            "source_question_id": "HQ045",
+            "conversation_goal": "Preserve the active person and shared-activity names across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "With whom does Christoph Beisheim share an activity?",
+                    "expected_answer": "Christoph Beisheim shares activities with Francis Jaquenod, Antoine Kohler, and Aletta von Lindeiner.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "relationship_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "explore_network"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "List only the names again.",
+                    "expected_answer": "Francis Jaquenod, Antoine Kohler, and Aletta von Lindeiner.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "compression"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "How many people is that?",
+                    "expected_answer": "Christoph Beisheim shares activities with 3 person.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "counting"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 4,
+                    "user_message": "Which person were we talking about?",
+                    "expected_answer": "We were talking about Christoph Beisheim.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C013",
+            "scenario_type": "shared_activities_memory",
+            "source_question_id": "HQ047",
+            "conversation_goal": "Preserve the active person and shared-activity names across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "Show all people connected to Williamson, Zachary James",
+                    "expected_answer": "Williamson, Zachary James shares activities with Sterchi, Herbert and Schenk, Arnaud.",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "relationship_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "explore_network"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "List only the names again.",
+                    "expected_answer": "Sterchi, Herbert and Schenk, Arnaud.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "Where is Aztec Foundation based?",
+                    "expected_answer": "Zug.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "retrieval"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 4,
+                    "user_message": "who are the owners of this company?",
+                    "expected_answer": "Williamson, Zachary James, Sterchi, Herbert and Schenk, Arnaud.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        },
+        {
+            "conversation_id": "C014",
+            "scenario_type": "shared_activities_memory",
+            "source_question_id": "HQ048",
+            "conversation_goal": "Preserve the active company and shared-activity names across follow-up turns.",
+            "turns": [
+                {
+                    "turn_id": 1,
+                    "user_message": "Where is Blue Boson AG based?",
+                    "expected_answer": "Zug",
+                    "evaluation_focus": [
+                        "retrieval",
+                        "relationship_lookup"
+                    ],
+                    "expected_tool_behavior": [
+                        "explore_network"
+                    ]
+                },
+                {
+                    "turn_id": 2,
+                    "user_message": "who are the owners?",
+                    "expected_answer": "Sterchi, Herbert and Robert Pawel Zagozdzon.",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 3,
+                    "user_message": "Is Robert Pawel Zagozdzon involved in other companies?",
+                    "expected_answer": "no.",
+                    "evaluation_focus": [
+                        "context_carryover",
+                        "retrieval"
+                    ],
+                    "expected_tool_behavior": []
+                },
+                {
+                    "turn_id": 4,
+                    "user_message": "Is Sterchi, Herbert involved in other companies? If yes, how many?",
+                    "expected_answer": "38",
+                    "evaluation_focus": [
+                        "entity_memory"
+                    ],
+                    "expected_tool_behavior": []
+                }
+            ]
+        }
+    ]
+}

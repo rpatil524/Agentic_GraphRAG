@@ -1,0 +1,13 @@
+requests
+tqdm
+pandas
+python-dateutil
+python-dotenv
+neo4j
+openai
+aiohttp
+fastapi
+uvicorn
+pydantic
+chromadb
+python-Levenshtein
