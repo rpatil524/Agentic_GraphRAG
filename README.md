@@ -24,6 +24,26 @@ This repository contains the complete implementation used in the paper:
 └── README.md
 ```
 
+## Architecture Overview
+
+### Data Ingestion Pipeline
+
+The knowledge graph is built through a three-phase ingestion pipeline designed for mixed commercial-registry data (structured metadata + unstructured legal text). In **Phase 1**, schema-driven parsing creates **strong nodes** (`Company`, `Person`, `Event`) directly from verified registry fields. In **Phase 2**, an LLM processes selected high-value event texts and extracts latent actors (for example, liquidators and creditors) as **weak nodes** under constrained JSON output. In **Phase 3**, identity resolution applies deterministic alphabetical tokenization (`generate_hub_key`) and links names to `NameHub` anchors, then performs hub deduplication and weak-node absorption to compress duplicate structures.
+
+This design separates deterministic ingestion from probabilistic extraction, then resolves both layers in-database with Cypher cleanup. The result is a deduplicated Neo4j graph optimized for multi-hop traversal, temporal analysis, and reliable entity disambiguation.
+
+<!-- FIGURE PLACEHOLDER: Data Pipeline (replace with your paper figure path) -->
+![Data ingestion pipeline figure placeholder](./docs/figures/data_pipeline_placeholder.png)
+
+### Analytical Agent Architecture
+
+The agent is implemented as a controlled three-stage architecture. First, a zero-shot **intent router** classifies the user request and restricts the available tool set to avoid tool overload. Second, a bounded **agentic reflection loop** (max 4 iterations) iteratively chooses a secure endpoint, generates JSON arguments, executes Neo4j-backed retrieval, and incorporates deterministic backend feedback after each call. Third, **response synthesis** is constrained by a strict state machine that tracks conversational progression (for example, disambiguation, dossier, network/history exploration, and deep-text fallback) and injects routing instructions before the final answer is rendered.
+
+This separation of routing, tool execution, and synthesis improves reliability and auditability in expert workflows. It prevents uncontrolled query behavior, enforces read-only safety constraints for custom Cypher, and keeps the final response grounded in an explicit execution trajectory visible in the dashboard.
+
+<!-- FIGURE PLACEHOLDER: Agent Architecture (replace with your paper figure path) -->
+![Analytical agent architecture figure placeholder](./docs/figures/agent_architecture_placeholder.png)
+
 ## 1) System Requirements
 
 - Python 3.9+
