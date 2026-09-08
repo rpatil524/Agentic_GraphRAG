@@ -9,7 +9,7 @@ import tqdm
 from neo4j import GraphDatabase
 from openai import AsyncOpenAI
 
-from _bootstrap import ensure_paths, output_dir
+from _bootstrap import REPO_ROOT, ensure_paths, output_dir
 
 ensure_paths()
 
@@ -17,7 +17,9 @@ from baseline_rag.vector_rag import NaiveVectorRAG
 from agenticGraphRAG.investigator import SHABInvestigator
 
 
-DATASET_PATH = "evaluation/datasets/conversational_dataset.json"
+DATASET_PATH = str(
+    REPO_ROOT / "evaluation" / "datasets" / "conversational_dataset.json"
+)
 AGENT_OUTPUT_PATH = str(output_dir() / "tier4_graph_conversational_results.json")
 BASELINE_OUTPUT_PATH = str(output_dir() / "tier4_baseline_conversational_results.json")
 SUMMARY_OUTPUT_PATH = str(output_dir() / "tier4_conversational_summary.json")
@@ -51,24 +53,33 @@ def load_dataset(path=DATASET_PATH, conversation_ids=None):
 
 class ConversationalJudge:
     def __init__(self, api_key=None, concurrency=15):
-        self.client = AsyncOpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+        resolved_key = api_key or os.getenv("OPENAI_API_KEY")
+        if not resolved_key:
+            raise RuntimeError("OPENAI_API_KEY is required.")
+        self.client = AsyncOpenAI(api_key=resolved_key)
+        self.judge_model = os.getenv("OPENAI_JUDGE_MODEL", "gpt-5-2025-08-07")
         self.sem = asyncio.Semaphore(concurrency)
 
-    async def score_float(self, prompt, fallback):
+    async def score_float(self, prompt):
         async with self.sem:
+            last_error = None
             for attempt in range(4):
                 try:
                     res = await self.client.chat.completions.create(
-                        model="gpt-5",
+                        model=self.judge_model,
                         messages=[{"role": "user", "content": prompt}],
                     )
-                    return float(res.choices[0].message.content.strip())
+                    score = float(res.choices[0].message.content.strip())
+                    if not 0.0 <= score <= 1.0:
+                        raise ValueError(f"Judge returned an out-of-range score: {score}")
+                    return score
                 except Exception as e:
+                    last_error = e
                     if "429" in str(e):
                         await asyncio.sleep(5 * (attempt + 1))
-                    else:
-                        break
-        return fallback
+                    elif attempt < 3:
+                        await asyncio.sleep(attempt + 1)
+        raise RuntimeError("Conversational judging failed after four attempts.") from last_error
 
     async def correctness(self, question, expected, answer):
         prompt = f"""Given the question, the expected answer, and the actual answer, compute a correctness score between 0.0 and 1.0.
@@ -81,7 +92,7 @@ Question: {question}
 Expected Answer: {expected}
 Actual Answer: {answer}
 """
-        return await self.score_float(prompt, 0.8)
+        return await self.score_float(prompt)
 
     async def relevance(self, question, answer):
         prompt = f"""Given the question and the answer, compute an answer relevance score between 0.0 and 1.0.
@@ -91,7 +102,7 @@ Output ONLY a float number.
 Question: {question}
 Answer: {answer}
 """
-        return await self.score_float(prompt, 0.9)
+        return await self.score_float(prompt)
 
     async def recall(self, expected, answer):
         prompt = f"""Compare the Expected Answer to the Actual Answer.
@@ -101,7 +112,7 @@ Output ONLY a float number.
 Expected: {expected}
 Actual: {answer}
 """
-        return await self.score_float(prompt, 0.85)
+        return await self.score_float(prompt)
 
 
 async def run_baseline_conversations(dataset, output_path=BASELINE_OUTPUT_PATH, concurrency=15):
@@ -137,7 +148,7 @@ Answer carefully. If the information is not available, say so briefly.
 """
         async with sem:
             response = await baseline.async_client.chat.completions.create(
-                model="gpt-5",
+                model=os.getenv("OPENAI_CONVERSATION_MODEL", "gpt-5-2025-08-07"),
                 messages=[{"role": "user", "content": prompt}],
             )
         return response.choices[0].message.content, context_docs
@@ -184,10 +195,11 @@ def run_graph_conversations(dataset, output_path=AGENT_OUTPUT_PATH):
     password = os.getenv("NEO4J_PASSWORD", "")
     if not password:
         raise RuntimeError("NEO4J_PASSWORD is required.")
+    database = os.getenv("NEO4J_DATABASE", "shabdb")
     api_key = os.getenv("OPENAI_API_KEY")
 
     driver = GraphDatabase.driver(uri, auth=(user, password))
-    investigator = SHABInvestigator(driver=driver, api_key=api_key)
+    investigator = SHABInvestigator(driver=driver, api_key=api_key, database=database)
     results = []
 
     print(f"Running graph agent on {len(dataset)} conversations...")
@@ -351,16 +363,18 @@ async def main():
         help="Optional subset of conversation IDs to evaluate. Defaults to the curated subset.",
     )
     parser.add_argument(
-        "--reuse-graph-results",
+        "--rerun-graph",
         action="store_true",
-        default=True,
-        help="Reuse existing graph conversational results if the output file already exists.",
+        help="Regenerate graph conversational results even when a saved output exists.",
     )
     args = parser.parse_args()
 
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is required for Tier 4 generation and judging.")
+
     dataset = load_dataset(DATASET_PATH, conversation_ids=args.conversation_ids)
 
-    if args.reuse_graph_results and os.path.exists(AGENT_OUTPUT_PATH):
+    if not args.rerun_graph and os.path.exists(AGENT_OUTPUT_PATH):
         print(f"Reusing existing graph conversational results from {AGENT_OUTPUT_PATH}")
     else:
         run_graph_conversations(dataset, AGENT_OUTPUT_PATH)

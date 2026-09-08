@@ -2,32 +2,50 @@
 import React, { useState, useEffect } from 'react';
 import NetworkGraph from './NetworkGraph';
 import { apiUrl } from '../lib/api';
+import type { Entity, EntityDetails, EventRecord, PersonRecord } from '../lib/types';
 
-export default function Dashboard({ entity, setSelectedEntity }: any) {
-    const [details, setDetails] = useState<any>(null);
-    const [people, setPeople] = useState([]);
-    const [events, setEvents] = useState([]);
+interface DashboardProps {
+    entity: Entity | null;
+    setSelectedEntity: (entity: Entity | null) => void;
+}
+
+type DisplayValue = string | number | null | undefined;
+
+export default function Dashboard({ entity, setSelectedEntity }: DashboardProps) {
+    const [details, setDetails] = useState<EntityDetails | null>(null);
+    const [people, setPeople] = useState<PersonRecord[]>([]);
+    const [events, setEvents] = useState<EventRecord[]>([]);
     const [showNetwork, setShowNetwork] = useState(false);
     const uid = entity?.uid;
 
     useEffect(() => {
+        setDetails(null);
+        setPeople([]);
+        setEvents([]);
+        setShowNetwork(false);
         if (!uid) return;
+
+        const controller = new AbortController();
         const fetchData = async () => {
             try {
                 const [detRes, pplRes, evRes] = await Promise.all([
-                    fetch(apiUrl(`/api/entity/${uid}`)),
-                    fetch(apiUrl(`/api/entity/${uid}/people`)),
-                    fetch(apiUrl(`/api/entity/${uid}/events`))
+                    fetch(apiUrl(`/api/entity/${uid}`), { signal: controller.signal }),
+                    fetch(apiUrl(`/api/entity/${uid}/people`), { signal: controller.signal }),
+                    fetch(apiUrl(`/api/entity/${uid}/events`), { signal: controller.signal })
                 ]);
 
-                if (detRes.ok) setDetails((await detRes.json()).data);
-                if (pplRes.ok) setPeople((await pplRes.json()).people);
-                if (evRes.ok) setEvents((await evRes.json()).events);
-            } catch (err) {
-                console.error("Error fetching entity data", err);
+                if (!detRes.ok) throw new Error(`Entity request failed with status ${detRes.status}`);
+                setDetails((await detRes.json()).data);
+                setPeople(pplRes.ok ? (await pplRes.json()).people : []);
+                setEvents(evRes.ok ? (await evRes.json()).events : []);
+            } catch (error: unknown) {
+                if (!controller.signal.aborted) {
+                    console.error("Error fetching entity data", error);
+                }
             }
         };
         fetchData();
+        return () => controller.abort();
     }, [uid]);
 
     if (!uid) {
@@ -102,7 +120,7 @@ export default function Dashboard({ entity, setSelectedEntity }: any) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-800">
-                            {people.map((p: any, i: number) => (
+                            {people.map((p, i) => (
                                 <tr key={i} className="hover:bg-neutral-800/50 transition-colors">
                                     <td className="p-4 text-sm font-bold text-white">{p.Name}</td>
                                     <td className="p-4 text-sm text-neutral-400">{p.Origin || '-'}</td>
@@ -122,7 +140,7 @@ export default function Dashboard({ entity, setSelectedEntity }: any) {
             <div className="bg-neutral-900 rounded-2xl shadow-xl border border-neutral-800 p-8 mb-6">
                 <h3 className="text-xl font-bold mb-6 text-white border-b border-neutral-800 pb-3">📅 Event History</h3>
                 <div className="space-y-4 max-h-96 overflow-y-auto custom-scrollbar pr-2">
-                    {events.map((e: any, i: number) => (
+                    {events.map((e, i) => (
                         <div key={i} className="border border-neutral-800 rounded-xl p-5 hover:border-purple-500/50 transition-colors bg-neutral-950">
                             <div className="flex justify-between items-center mb-3">
                                 <span className="font-bold text-white flex items-center gap-2"><span className="text-purple-500">❖</span> {e.Rubric}</span>
@@ -140,7 +158,15 @@ export default function Dashboard({ entity, setSelectedEntity }: any) {
     );
 }
 
-function MetricCard({ title, value, highlight }: any) {
+function MetricCard({
+    title,
+    value,
+    highlight = false,
+}: {
+    title: string;
+    value: DisplayValue;
+    highlight?: boolean;
+}) {
     return (
         <div className={`p-6 rounded-2xl shadow-sm border flex flex-col items-start transition-all transform hover:-translate-y-1 hover:shadow-lg ${highlight ? 'bg-gradient-to-br from-purple-900/20 to-neutral-900 border-purple-500/50' : 'bg-neutral-900 border-neutral-800'}`}>
             <div className={`text-xs font-bold mb-2 uppercase tracking-wider ${highlight ? 'text-purple-400' : 'text-neutral-500'}`}>{title}</div>
@@ -149,7 +175,7 @@ function MetricCard({ title, value, highlight }: any) {
     );
 }
 
-function MetaRow({ label, value }: { label: string, value: any }) {
+function MetaRow({ label, value }: { label: string, value: DisplayValue }) {
     const isEmpty = !value || value === '-';
     return (
         <div className="flex justify-between items-center py-2 border-b border-neutral-800/50 last:border-0">

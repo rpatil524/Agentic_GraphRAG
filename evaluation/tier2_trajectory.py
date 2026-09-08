@@ -13,7 +13,7 @@ import os
 import time
 from neo4j import GraphDatabase
 
-from _bootstrap import ensure_paths, output_dir
+from _bootstrap import REPO_ROOT, ensure_paths, output_dir
 
 ensure_paths()
 
@@ -48,7 +48,7 @@ def track_trajectory(trace_log):
 
 DEFAULT_DATASET_PATH = os.getenv(
     "AUTOMATED_DATASET_PATH",
-    "evaluation/datasets/automated_dataset.json",
+    str(REPO_ROOT / "evaluation" / "datasets" / "automated_dataset.json"),
 )
 DEFAULT_OUTPUT_PATH = str(output_dir() / "tier2_trajectory_results.json")
 
@@ -58,7 +58,7 @@ def evaluate_tier_2(dataset_path=DEFAULT_DATASET_PATH, limit=None, output_path=D
         print(f"Dataset {dataset_path} not found! Please run generate_dataset.py first.")
         return
         
-    with open(dataset_path, "r") as f:
+    with open(dataset_path, "r", encoding="utf-8") as f:
         questions = json.load(f)
         
     
@@ -68,55 +68,62 @@ def evaluate_tier_2(dataset_path=DEFAULT_DATASET_PATH, limit=None, output_path=D
     password = os.getenv("NEO4J_PASSWORD", "")
     if not password:
         raise RuntimeError("NEO4J_PASSWORD is required.")
+    database = os.getenv("NEO4J_DATABASE", "shabdb")
     driver = GraphDatabase.driver(uri, auth=(user, password))
     
-    # Use API Key from environment or hardcoded mapping if provided elsewhere
     api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is required for agent execution.")
     
-    investigator = SHABInvestigator(driver=driver, api_key=api_key)
+    investigator = SHABInvestigator(driver=driver, api_key=api_key, database=database)
     results = []
     latencies = []
     
     # We evaluate sequentially since SHABInvestigator maintains context per-instance if not careful.
     # But ask() handles statelessness well.
     selected_questions = questions[:limit] if limit is not None else questions
+    if not selected_questions:
+        driver.close()
+        raise ValueError("The selected Tier 2 benchmark contains no questions.")
 
     print(f"Starting Tier 2 Trajectory Evaluation on {len(selected_questions)} real questions...")
-    for q in selected_questions:
-        question_text = q["question_text"]
-        print(f"\nProcessing: {question_text}")
-        
-        trace = []
-        def trace_callback(msg):
-            trace.append(msg)
-            print(f"  {msg}")
-            
-        start_time = time.time()
-        try:
-            response = investigator.ask(question_text, trace_callback=trace_callback)
-            answer = response.get("answer", "No answer generated.")
-            retrieved_context = json.dumps(response.get("data", []))
-        except Exception as e:
-            print(f"Error on {q['question_id']}: {e}")
-            answer = f"Error: {e}"
-            retrieved_context = "[]"
-        latency = time.time() - start_time
-        latencies.append(latency)
-            
-        trajectory_score = track_trajectory(trace)
-        
-        results.append({
-            "question_id": q["question_id"],
-            "question": question_text,
-            "level": q["difficulty_level"],
-            "trajectory": trajectory_score,
-            "trace_log": trace,
-            "retrieved_context": retrieved_context,
-            "agent_answer": answer,
-            "expected_answer": q["expected_answer"],
-            "latency_seconds": latency
-        })
-        time.sleep(1) # throttle OpenAI API calls
+    try:
+        for q in selected_questions:
+            question_text = q["question_text"]
+            print(f"\nProcessing: {question_text}")
+
+            trace = []
+
+            def trace_callback(msg):
+                trace.append(msg)
+                print(f"  {msg}")
+
+            start_time = time.time()
+            try:
+                response = investigator.ask(question_text, trace_callback=trace_callback)
+                answer = response.get("answer", "No answer generated.")
+                retrieved_context = json.dumps(response.get("data", []))
+            except Exception as exc:
+                print(f"Error on {q['question_id']}: {exc}")
+                answer = f"Error: {exc}"
+                retrieved_context = "[]"
+            latency = time.time() - start_time
+            latencies.append(latency)
+
+            results.append({
+                "question_id": q["question_id"],
+                "question": question_text,
+                "level": q["difficulty_level"],
+                "trajectory": track_trajectory(trace),
+                "trace_log": trace,
+                "retrieved_context": retrieved_context,
+                "agent_answer": answer,
+                "expected_answer": q["expected_answer"],
+                "latency_seconds": latency,
+            })
+            time.sleep(1)  # Avoid bursts against the OpenAI API.
+    finally:
+        driver.close()
 
     # Aggregate Metrics
     success_rate = sum(1 for r in results if r["trajectory"]["success"]) / len(results)
@@ -138,11 +145,12 @@ def evaluate_tier_2(dataset_path=DEFAULT_DATASET_PATH, limit=None, output_path=D
     for k, v in metrics.items():
         print(f"{k}: {v}")
         
-    with open(output_path, "w") as f:
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump({"metrics": metrics, "trajectories": results}, f, indent=4)
         
     print(f"\nResults saved to {output_path}")
     return {"metrics": metrics, "trajectories": results}
 
 if __name__ == "__main__":
-    evaluate_tier_2(limit=300)
+    evaluate_tier_2()

@@ -1,5 +1,9 @@
-import pandas as pd
+"""Serializable node and edge models used by the SHAB ingestion pipeline."""
+
 import hashlib
+
+import pandas as pd
+
 from .utils import clean_text, clean_date, generate_hub_key
 
 class SHABCompany:
@@ -43,7 +47,7 @@ class SHABCompany:
 			'content_commonsNew_company_uid'
 		])
 		
-		if pd.isna(uid):
+		if pd.isna(uid) or not str(uid).strip():
 			return None 
 
 		name = cls._get_first(row, [
@@ -135,7 +139,9 @@ class SHABCompany:
 		return None
 
 	def to_dict(self):
-		full_addr = f"{self.street or ''} {self.house_number or ''}, {self.zip_code or ''} {self.seat or ''}".strip()
+		street_line = " ".join(str(value) for value in (self.street, self.house_number) if value is not None).strip()
+		locality = " ".join(str(value) for value in (self.zip_code, self.seat) if value is not None).strip()
+		full_addr = ", ".join(value for value in (street_line, locality) if value)
 		
 		return {
 			'id': self.uid,
@@ -170,22 +176,15 @@ class SHABPerson:
 		
 		# Define self.name so it can be accessed in loops/exports
 		self.name = f"{self.firstname or ''} {self.lastname or ''}".strip()
-		
-		# Calculate the Name Key for the Hub (Lastname + Firstname for sorting)
-		# Define self.name so it can be accessed in loops/exports
-		self.name = f"{self.firstname or ''} {self.lastname or ''}".strip()
 
-		# Calculate the Name Key for the Hub (Alphabetized to handle token order issues)
+		# Alphabetical tokenization makes the key independent of token order.
 		self.name_key = generate_hub_key(self.name)
 	# ==========================================
 	#   FACTORY 1: STRONG NODE (From CSV)
 	# ==========================================
 	@classmethod
 	def from_row(cls, row):
-		# [CRITICAL FIX] Universal Case-Insensitive Check
-		# 1. Convert to string (handles NaNs safely)
-		# 2. Lowercase it
-		# 3. Check if 'person' is INSIDE the string (matches "Person", "NaturalPerson", "person")
+		# Match all source values that identify a natural person.
 		raw_type = str(row.get('content_debtor_selectType', '')).lower().strip()
 		
 		if 'person' not in raw_type:
@@ -195,6 +194,9 @@ class SHABPerson:
 		lastname = row.get('content_debtor_person_name')
 		origin = row.get('content_debtor_person_placeOfOrigin')
 		town = row.get('content_debtor_person_addressSwitzerland_town')
+		firstname = None if pd.isna(firstname) else firstname
+		origin = None if pd.isna(origin) else origin
+		town = None if pd.isna(town) else town
 		
 		# 2. Date Cleaning
 		raw_dob = row.get('content_debtor_person_dateOfBirth')
@@ -305,24 +307,26 @@ class SHABEvent:
 
 	# --- HELPERS ---
 	def _generate_person_id(self, row):
-		# Replicates SHABPerson logic exactly
-		if row.get('content_debtor_selectType') == 'person':
+		# Keep this identifier identical to SHABPerson.from_row.
+		raw_type = str(row.get('content_debtor_selectType', '')).lower().strip()
+		if 'person' in raw_type:
 			dob = clean_date(row.get('content_debtor_person_dateOfBirth'))
 			firstname = row.get('content_debtor_person_prename')
 			lastname = row.get('content_debtor_person_name')
 			origin = row.get('content_debtor_person_placeOfOrigin')
 			
-			if pd.notna(dob) and pd.notna(lastname):
+			if pd.notna(lastname) and str(lastname).strip():
 				fn = clean_text(firstname)
 				ln = clean_text(lastname)
 				orig = clean_text(origin)
-				return f"person_{ln}_{fn}_{dob}_{orig}"
+				dob_str = dob if dob else "unknown"
+				return f"person_{ln}_{fn}_{dob_str}_{orig}"
 		return None
 	# -------------------------------------------------------------
 
 	def _construct_text(self, row):
-		# (Paste your previous "Universal" _construct_text method here)
-		# For brevity, I am using the robust one we just finalized:
+		# Sparse publication fields are combined so downstream retrieval receives
+		# one coherent legal context per Event node.
 		parts = []
 		title = self._get_first(row, ['content_title', 'meta_title_de', 'content_publicationTitle'])
 		if title: parts.append(f"TITLE: {title}")
@@ -330,7 +334,7 @@ class SHABEvent:
 		body = self._get_first(row, ['content_publicationText', 'content_publication'])
 		if body: parts.append(f"DETAILS: {body}")
 		
-		# Juicy Columns
+		# Additional legal-notice fields
 		contact = row.get('content_contactPointForClaimAndAppeal')
 		if pd.notna(contact): parts.append(f"CONTACT_POINT: {contact}")
 		reg_office = row.get('content_registrationOffice')

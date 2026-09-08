@@ -1,8 +1,4 @@
-"""
-Naive Vector RAG Baseline for the SHAB domain.
-Simulates traditional RAG architecture (chunking -> embeddings -> vector DB -> LLM).
-This serves as the comparative baseline to prove the efficacy of the Graph RAG system.
-"""
+"""Dense vector-RAG baseline for the SHAB benchmarks."""
 
 import json
 import os
@@ -13,28 +9,53 @@ from tqdm import tqdm
 from openai import AsyncOpenAI, OpenAI
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase, READ_ACCESS
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DEFAULT_AUTOMATED_DATASET = os.path.join(
+    REPO_ROOT,
+    "evaluation",
+    "datasets",
+    "automated_dataset.json",
+)
 
 class NaiveVectorRAG:
-    def __init__(self, api_key=None, db_path="evaluation/baseline_rag/chroma_db", concurrency=15):
+    """Dense baseline backed by ChromaDB and all-MiniLM-L6-v2 embeddings."""
+
+    def __init__(self, api_key=None, db_path=None, concurrency=15, answer_model=None):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise RuntimeError("OPENAI_API_KEY is required.")
-        self.client = OpenAI(api_key=self.api_key)           # sync, used for non-eval calls
-        self.async_client = AsyncOpenAI(api_key=self.api_key) # async, used for eval
+        self.client = OpenAI(api_key=self.api_key) if self.api_key else None
+        self.async_client = AsyncOpenAI(api_key=self.api_key) if self.api_key else None
         self.concurrency = concurrency
-        
+        self.answer_model = answer_model or os.getenv(
+            "OPENAI_BASELINE_MODEL",
+            "gpt-4o-mini-2024-07-18",
+        )
+
+        if db_path is None:
+            db_path = os.getenv(
+                "CHROMA_DB_PATH",
+                os.path.join(os.path.dirname(__file__), "chroma_db"),
+            )
         print("Initializing ChromaDB...")
         self.chroma_client = chromadb.PersistentClient(path=db_path)
         
         # We use ChromaDB's default local embedding function (all-MiniLM-L6-v2)
-        # This allows you to ingest millions of records locally for free without OpenAI rate limits.
+        # Embeddings are computed locally, without OpenAI API calls.
         local_ef = embedding_functions.DefaultEmbeddingFunction()
         
         self.collection = self.chroma_client.get_or_create_collection(
             name="shab_events_local",
             embedding_function=local_ef
         )
+
+    def _require_openai(self):
+        """Fail clearly when an answer-generation method lacks credentials."""
+        if self.client is None or self.async_client is None:
+            raise RuntimeError(
+                "OPENAI_API_KEY is required for answer generation, but not for "
+                "local embedding ingestion or retrieval."
+            )
 
     def ingest_from_neo4j(self, reset=False):
         """
@@ -46,7 +67,8 @@ class NaiveVectorRAG:
             print("Resetting ChromaDB Collection...")
             try:
                 self.chroma_client.delete_collection("shab_events_local")
-            except:
+            except ValueError:
+                # Chroma raises ValueError when the collection does not exist.
                 pass
             local_ef = embedding_functions.DefaultEmbeddingFunction()
             self.collection = self.chroma_client.get_or_create_collection(
@@ -60,11 +82,15 @@ class NaiveVectorRAG:
         password = os.getenv("NEO4J_PASSWORD", "")
         if not password:
             raise RuntimeError("NEO4J_PASSWORD is required.")
+        database = os.getenv("NEO4J_DATABASE", "shabdb")
         
         driver = GraphDatabase.driver(uri, auth=(user, password))
         
         try:
-            with driver.session() as session:
+            with driver.session(
+                database=database,
+                default_access_mode=READ_ACCESS,
+            ) as session:
                 # 1. Get exact total count for the progress bar
                 count_res = session.run("MATCH (e:Event) WHERE e.text IS NOT NULL RETURN count(e) as total")
                 total_events = count_res.single()["total"]
@@ -195,6 +221,7 @@ class NaiveVectorRAG:
         return docs
 
     def generate_answer(self, question, context_docs):
+        self._require_openai()
         # Determine format of context docs (string vs dict)
         parsed_docs = []
         for doc in context_docs:
@@ -221,13 +248,14 @@ Context:
 Question: {question}
 """
         response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self.answer_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0
         )
         return response.choices[0].message.content
 
     async def generate_answer_async(self, question, context_docs, sem):
+        self._require_openai()
         """Async version of generate_answer with semaphore-controlled concurrency."""
         parsed_docs = []
         for doc in context_docs:
@@ -254,22 +282,25 @@ Context:
 Question: {question}
 """
         async with sem:
+            last_error = None
             for attempt in range(4):
                 try:
                     response = await self.async_client.chat.completions.create(
-                        model="gpt-4o-mini",
+                        model=self.answer_model,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.0
                     )
                     return response.choices[0].message.content
                 except Exception as e:
+                    last_error = e
                     if "429" in str(e):
                         await asyncio.sleep(5 * (attempt + 1))
                     else:
                         break
-        return "Error: failed after retries."
+        raise RuntimeError("Baseline answer generation failed after retries.") from last_error
 
     async def _generate_answer_no_sem(self, question, context_docs):
+        self._require_openai()
         """Internal helper without semaphore to avoid double locking."""
         parsed_docs = []
         for doc in context_docs:
@@ -295,27 +326,34 @@ Context:
 
 Question: {question}
 """
+        last_error = None
         for attempt in range(4):
             try:
                 response = await self.async_client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=self.answer_model,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.0
                 )
                 return response.choices[0].message.content
             except Exception as e:
+                last_error = e
                 if "429" in str(e):
                     await asyncio.sleep(5 * (attempt + 1))
                 else:
                     break
-        return "Error: failed after retries."
+        raise RuntimeError("Baseline answer generation failed after retries.") from last_error
 
     async def evaluate_golden_dataset_async(
         self,
-        dataset_path="evaluation/datasets/automated_dataset.json",
-        output_path="evaluation/baseline_results.json",
+        dataset_path=DEFAULT_AUTOMATED_DATASET,
+        output_path=None,
         limit=None,
     ):
+        self._require_openai()
+        if output_path is None:
+            from _bootstrap import output_dir
+
+            output_path = str(output_dir() / "baseline_results.json")
         if not os.path.exists(dataset_path):
             print(f"Dataset {dataset_path} not found! Please run generate_dataset.py first.")
             return
@@ -363,7 +401,8 @@ Question: {question}
             "results": results
         }
 
-        with open(output_path, "w") as f:
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(output_data, f, indent=4)
         print(f"Baseline evaluation complete. Avg Latency: {avg_latency:.2f}s. Results saved to {output_path}")
         return output_data

@@ -1,8 +1,10 @@
+"""Shared Neo4j connection and analytical-agent instance for the API."""
+
 import os
 import sys
 
-from neo4j import GraphDatabase
 from dotenv import load_dotenv
+from neo4j import GraphDatabase, READ_ACCESS
 
 # Ensure local package imports work when running the API directly.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -33,8 +35,12 @@ class Database:
         self.driver.close()
 
     def run_query(self, query, params=None):
-        with self.driver.session(database=DATABASE) as session:
-            result = session.run(query, params)
+        with self.driver.session(
+            database=DATABASE,
+            default_access_mode=READ_ACCESS,
+        ) as session:
+            result = session.run(query, params or {})
             return [r.data() for r in result]
+
 
 db = Database()

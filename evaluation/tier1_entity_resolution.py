@@ -1,15 +1,18 @@
 """
-Tier 1: Entity Resolution Evaluation
-Evaluates the accuracy of the alphabetical tokenization logic (`generate_hub_key`) 
-by connecting to Neo4j, pulling a random sample of NameHubs, and ensuring identical weak nodes merge correctly.
+Tier 1: Orthographic Consistency Evaluation
+Evaluates whether names grouped by the alphabetical tokenization logic
+(`generate_hub_key`) satisfy a conservative orthographic criterion.
 """
 
 import os
 import json
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase, READ_ACCESS
 import Levenshtein
 
 from _bootstrap import output_dir
+
+SIMILARITY_THRESHOLD = 0.7
+
 
 class EntityResolutionEvaluator:
     def __init__(self):
@@ -18,6 +21,7 @@ class EntityResolutionEvaluator:
         password = os.getenv("NEO4J_PASSWORD", "")
         if not password:
             raise RuntimeError("NEO4J_PASSWORD is required.")
+        self.database = os.getenv("NEO4J_DATABASE", "shabdb")
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def close(self):
@@ -38,7 +42,10 @@ class EntityResolutionEvaluator:
         
         sample_data = []
         try:
-            with self.driver.session() as session:
+            with self.driver.session(
+                database=self.database,
+                default_access_mode=READ_ACCESS,
+            ) as session:
                 result = session.run(query, limit=limit)
                 for record in result:
                     sample_data.append({
@@ -49,68 +56,67 @@ class EntityResolutionEvaluator:
                     })
                     
             print(f"Extracted {len(sample_data)} NameHub samples from the database.")
-        except Exception as e:
-            print(f"Failed to pull from Neo4j: {e}")
+        except Exception as exc:
+            print(f"Failed to pull from Neo4j: {exc}")
             return []
 
         return sample_data
 
-    def evaluate_precision_recall(self, sample_data):
+    def evaluate_orthographic_consistency(self, sample_data):
         """
-        Calculates the real precision of the deduplication.
-        Precision: Are the merged nodes actually the same entity? We use Levenshtein ratio > 0.6 as a proxy for 'True Positive'.
+        Calculates the share of grouped names that satisfy the orthographic rule.
         """
         if not sample_data:
             print("No data to evaluate.")
             return
             
-        true_positives = 0
+        acceptable_comparisons = 0
         total_pairs_evaluated = 0
         evaluated_pairs = []
         
         # We evaluate the pairwise similarity of all names merged under a single Hub
         for item in sample_data:
-            names = [str(n).lower() for n in item["merged_names"]]
-            hub_name = str(item['hub_name']).lower()
+            names = [str(name).lower() for name in item["merged_names"]]
+            hub_name = str(item["hub_name"]).lower()
             
             for name in names:
                 total_pairs_evaluated += 1
                 
-                # Calculate similarity between the original component name and the Hub's master name
-                # E.g. "Kauter, Martin" vs "Martin Kauter"
+                # Compare each observed name with the canonical NameHub form.
                 similarity = Levenshtein.ratio(name, hub_name)
                 
                 # If similarity is high enough, or if sorting the words makes them identical
-                tokens_name = sorted(name.replace(',', '').split())
-                tokens_hub = sorted(hub_name.replace(',', '').split())
+                tokens_name = sorted(name.replace(",", "").split())
+                tokens_hub = sorted(hub_name.replace(",", "").split())
                 
-                is_tp = False
-                if similarity > 0.6 or tokens_name == tokens_hub:
-                    true_positives += 1
-                    is_tp = True
+                is_acceptable = similarity > SIMILARITY_THRESHOLD or tokens_name == tokens_hub
+                if is_acceptable:
+                    acceptable_comparisons += 1
                     
                 evaluated_pairs.append({
                     "hub_name": hub_name,
                     "merged_name": name,
                     "similarity_score": similarity,
-                    "is_true_positive": is_tp
+                    "meets_orthographic_criterion": is_acceptable
                 })
 
-        precision = (true_positives / total_pairs_evaluated) * 100 if total_pairs_evaluated > 0 else 0
+        consistency_rate = (
+            acceptable_comparisons / total_pairs_evaluated
+        ) * 100 if total_pairs_evaluated > 0 else 0
         
         report = {
             "Total_Hubs_Sampled": len(sample_data),
             "Total_Name_Pairs_Evaluated": total_pairs_evaluated,
-            "Real_Precision": f"{precision:.2f}%"
+            "Orthographic_Consistency_Rate": f"{consistency_rate:.2f}%"
         }
         
         out_path = output_dir() / "tier1_sample_results.json"
-        with open(out_path, "w") as f:
+        with open(out_path, "w", encoding="utf-8") as f:
             json.dump({
                 "metrics": report,
                 "detailed_evaluations": evaluated_pairs,
                 "sample_data": sample_data
-            }, f, indent=4)
+            }, f, indent=2, ensure_ascii=False)
             
         print(f"Tier 1 Evaluation Complete. Results written to {out_path}")
         for k, v in report.items():
@@ -118,6 +124,8 @@ class EntityResolutionEvaluator:
             
 if __name__ == "__main__":
     evaluator = EntityResolutionEvaluator()
-    sample = evaluator.generate_sample(limit=1000)
-    evaluator.evaluate_precision_recall(sample)
-    evaluator.close()
+    try:
+        sample = evaluator.generate_sample(limit=1000)
+        evaluator.evaluate_orthographic_consistency(sample)
+    finally:
+        evaluator.close()

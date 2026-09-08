@@ -9,6 +9,7 @@ from pathlib import Path
 
 EVAL_DIR = Path(__file__).resolve().parent
 REPO_ROOT = EVAL_DIR.parent
+DEFAULT_OUTPUT_DIR = EVAL_DIR / "results"
 
 
 def ensure_paths() -> None:
@@ -19,7 +20,9 @@ def ensure_paths() -> None:
 
 
 def output_dir() -> Path:
-    """Return output directory for evaluation artifacts."""
-    out = Path(os.getenv("EVAL_OUTPUT_DIR", str(EVAL_DIR)))
+    """Return the local directory used for generated evaluation artifacts."""
+    out = Path(os.getenv("EVAL_OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR))).expanduser()
+    if not out.is_absolute():
+        out = REPO_ROOT / out
     out.mkdir(parents=True, exist_ok=True)
     return out

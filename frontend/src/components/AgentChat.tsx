@@ -3,9 +3,27 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { apiUrl } from '../lib/api';
+import type { ChatMessage, Entity } from '../lib/types';
 
-export default function AgentChat({ entity, isExpanded, onToggleExpand, onClose }: any) {
-	const [chatHistories, setChatHistories] = useState<Record<string, any[]>>({ global: [] });
+interface AgentChatProps {
+	entity: Entity | null;
+	isExpanded: boolean;
+	onToggleExpand: () => void;
+	onClose: () => void;
+}
+
+interface ChatResponse {
+	result?: {
+		answer?: string;
+		cypher?: string;
+		data?: Record<string, unknown>[];
+	};
+}
+
+const EMPTY_MESSAGES: ChatMessage[] = [];
+
+export default function AgentChat({ entity, isExpanded, onToggleExpand, onClose }: AgentChatProps) {
+	const [chatHistories, setChatHistories] = useState<Record<string, ChatMessage[]>>({ global: [] });
 	const [input, setInput] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [liveTraceId, setLiveTraceId] = useState<string | null>(null);
@@ -16,7 +34,7 @@ export default function AgentChat({ entity, isExpanded, onToggleExpand, onClose 
 	const uid = entity?.uid;
 	const name = entity?.name || 'Global';
 	const currentSession = uid || 'global';
-	const messages = chatHistories[currentSession] || [];
+	const messages = chatHistories[currentSession] ?? EMPTY_MESSAGES;
 
 	useEffect(() => {
 		endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,7 +60,7 @@ export default function AgentChat({ entity, isExpanded, onToggleExpand, onClose 
 		const text = typeof overrideInput === 'string' ? overrideInput : input;
 		if (!text.trim() || loading) return;
 
-		const userMsg = { role: 'user', content: text };
+		const userMsg: ChatMessage = { role: 'user', content: text };
 		setChatHistories(prev => ({
 			...prev,
 			[currentSession]: [...(prev[currentSession] || []), userMsg]
@@ -64,17 +82,19 @@ export default function AgentChat({ entity, isExpanded, onToggleExpand, onClose 
 				body: JSON.stringify({ question: userMsg.content, uid, chat_history: messages, trace_id: newTraceId }),
 				signal: abortControllerRef.current.signal
 			});
-			const data = await res.json();
+			if (!res.ok) throw new Error(`Agent request failed with status ${res.status}`);
+			const data = await res.json() as ChatResponse;
 
-			if (data.result && data.result.answer) {
+			if (data.result?.answer) {
+				const assistantMessage: ChatMessage = {
+					role: 'assistant',
+					content: data.result.answer,
+					trace: data.result.cypher,
+					records: data.result.data,
+				};
 				setChatHistories(prev => ({
 					...prev,
-					[currentSession]: [...(prev[currentSession] || []), {
-						role: 'assistant',
-						content: data.result.answer,
-						trace: data.result.cypher,
-						records: data.result.data
-					}]
+					[currentSession]: [...(prev[currentSession] || []), assistantMessage]
 				}));
 			} else {
 				setChatHistories(prev => ({
@@ -82,8 +102,8 @@ export default function AgentChat({ entity, isExpanded, onToggleExpand, onClose 
 					[currentSession]: [...(prev[currentSession] || []), { role: 'assistant', content: "No answer received." }]
 				}));
 			}
-		} catch (err: any) {
-			if (err.name === 'AbortError') {
+		} catch (err: unknown) {
+			if (err instanceof DOMException && err.name === 'AbortError') {
 				setChatHistories(prev => ({
 					...prev,
 					[currentSession]: [...(prev[currentSession] || []), { role: 'assistant', content: "⚠️ Investigation stopped by user." }]
@@ -147,7 +167,7 @@ export default function AgentChat({ entity, isExpanded, onToggleExpand, onClose 
 					</div>
 				)}
 				{messages.map((m, i) => {
-					const isLastAssistantMessage = m.role === 'assistant' && i === messages.findLastIndex((msg: any) => msg.role === 'assistant');
+					const isLastAssistantMessage = m.role === 'assistant' && i === messages.findLastIndex((msg) => msg.role === 'assistant');
 
 					return (
 						<div key={i} className={`flex flex-col w-full ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -161,12 +181,12 @@ export default function AgentChat({ entity, isExpanded, onToggleExpand, onClose 
 									<ReactMarkdown
 										remarkPlugins={[remarkGfm]}
 										components={{
-											table: ({ node, ...props }) => <table className="w-full text-left border-collapse my-2 mt-4 text-xs" {...props} />,
-											thead: ({ node, ...props }) => <thead className="bg-neutral-800 text-purple-300 uppercase" {...props} />,
-											th: ({ node, ...props }) => <th className="px-3 py-2 border border-neutral-700 font-semibold" {...props} />,
-											td: ({ node, ...props }) => <td className="px-3 py-2 border border-neutral-700 align-top" {...props} />,
-											a: ({ node, ...props }) => <a className="text-purple-400 hover:underline" {...props} />,
-											p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />
+										table: ({ children }) => <table className="w-full text-left border-collapse my-2 mt-4 text-xs">{children}</table>,
+										thead: ({ children }) => <thead className="bg-neutral-800 text-purple-300 uppercase">{children}</thead>,
+										th: ({ children }) => <th className="px-3 py-2 border border-neutral-700 font-semibold">{children}</th>,
+										td: ({ children }) => <td className="px-3 py-2 border border-neutral-700 align-top">{children}</td>,
+										a: ({ children, href }) => <a href={href} className="text-purple-400 hover:underline">{children}</a>,
+										p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>
 										}}
 									>
 										{m.content}

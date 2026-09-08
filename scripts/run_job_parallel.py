@@ -21,40 +21,43 @@ Environment variables:
     OPENAI_API_KEY     Required for Phase 2 LLM enrichment.
 """
 
-import sys
 import glob
 import os
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 import tqdm
 
-# Add repo root to sys.path so agenticGraphRAG can be imported regardless of cwd.
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 from agenticGraphRAG import SHABPipeline
 
 
-# Project root is two levels up from scripts/.
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-INPUT_GLOB = os.getenv("INPUT_GLOB", os.path.join(PROJECT_ROOT, "shab_data/*"))
-OUTPUT_DIR = os.getenv("OUTPUT_DIR", os.path.join(PROJECT_ROOT, "processed_data/processed_graph_data_archive"))
+INPUT_GLOB = os.getenv("INPUT_GLOB", str(REPO_ROOT / "shab_data" / "*"))
+OUTPUT_DIR = Path(
+    os.getenv(
+        "OUTPUT_DIR",
+        str(REPO_ROOT / "processed_data" / "processed_graph_data_archive"),
+    )
+).expanduser()
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "4"))
 ROW_LIMIT_RAW = os.getenv("ROW_LIMIT", "").strip()
 ROW_LIMIT = int(ROW_LIMIT_RAW) if ROW_LIMIT_RAW else None
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def process_folder(folder_path):
     """
     Process one folder containing SHAB CSV data and output one graph checkpoint file.
     """
     folder_name = os.path.basename(folder_path)
-    output_file = f"{OUTPUT_DIR}/graph_{folder_name}.json"
+    output_file = OUTPUT_DIR / f"graph_{folder_name}.json"
 
     try:
-        csv_files = glob.glob(f"{folder_path}/*.csv")
+        csv_files = sorted(glob.glob(os.path.join(folder_path, "*.csv")))
         if not csv_files:
             return f"⚠️ No CSV in {folder_name}"
         csv_path = csv_files[0]
@@ -66,7 +69,7 @@ def process_folder(folder_path):
 
         pipeline = SHABPipeline(api_key=OPENAI_API_KEY)
         pipeline.run_phase_1_structured_ingestion(df)
-        pipeline.run_phase_3_structured_edges()
+        pipeline.run_structured_edge_creation()
 
         llm_candidates = pipeline.identify_candidates()
 
@@ -74,7 +77,6 @@ def process_folder(folder_path):
         if llm_candidates and OPENAI_API_KEY:
             enrichment_count = len(llm_candidates)
             pipeline.run_phase_2_unstructured_ingestion(
-                use_mock=False,
                 batch_size=20,
                 subset_events=llm_candidates,
             )
@@ -98,7 +100,7 @@ def main():
     pending_folders = [
         f
         for f in all_folders
-        if not os.path.exists(f"{OUTPUT_DIR}/graph_{os.path.basename(f)}.json")
+        if not (OUTPUT_DIR / f"graph_{os.path.basename(f)}.json").exists()
     ]
 
     print(
@@ -109,6 +111,16 @@ def main():
     print(f"   - Input glob: {INPUT_GLOB}")
     print(f"   - Output dir: {OUTPUT_DIR}")
     print(f"   - Row limit: {ROW_LIMIT if ROW_LIMIT is not None else 'None'}")
+
+    if not all_folders:
+        raise FileNotFoundError(
+            f"No input folders matched INPUT_GLOB={INPUT_GLOB!r}. "
+            "Run the downloader or set INPUT_GLOB to the monthly SHAB folders."
+        )
+    if pending_folders and not OPENAI_API_KEY:
+        raise RuntimeError(
+            "OPENAI_API_KEY is required for Phase 2 weak-node extraction."
+        )
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_folder = {

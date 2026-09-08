@@ -16,20 +16,22 @@ Steps:
 
 import glob
 import os
-import tqdm
 import sys
+from pathlib import Path
 
-# Add repo root to sys.path so agenticGraphRAG can be imported.
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import tqdm
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 from agenticGraphRAG.graph_db import Neo4jIngester
 
-# ─────────────────────────────────────────────
-# CONFIGURATION — update these before running
-# ─────────────────────────────────────────────
-# DATA_FOLDER defaults to a processed_data directory under the repo root.
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA_FOLDER = os.getenv("PROCESSED_GRAPH_DIR", os.path.join(PROJECT_ROOT, "processed_data/processed_graph_data_archive"))
+DATA_FOLDER = Path(
+    os.getenv(
+        "PROCESSED_GRAPH_DIR",
+        str(REPO_ROOT / "processed_data" / "processed_graph_data_archive"),
+    )
+).expanduser()
 URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 AUTH = (
     os.getenv("NEO4J_USER", "neo4j"),
@@ -40,14 +42,19 @@ ANONYMIZE_DATA = os.getenv("ANONYMIZE_DATA", "false").lower() in {"1", "true", "
 ANONYMIZATION_SECRET_KEY = os.getenv("ANONYMIZATION_SECRET_KEY", "")
 ANONYMIZATION_OUTPUT = os.getenv(
     "ANONYMIZATION_OUTPUT",
-    os.path.join(PROJECT_ROOT, "processed_data", "anonymization_mapping.json"),
+    str(REPO_ROOT / "processed_data" / "anonymization_mapping.json"),
 )
-# ─────────────────────────────────────────────
+SKIP_ANALYTICS = os.getenv("SKIP_ANALYTICS", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+    "y",
+}
 
 
 def main():
     print("=" * 60)
-    print("  SHAB Risk Radar — Database Ingestion Pipeline")
+    print("  Agentic GraphRAG — Database Ingestion Pipeline")
     print("=" * 60)
 
     if not AUTH[1]:
@@ -62,10 +69,10 @@ def main():
     print("   ✅ Schema ready.")
 
     # ── STEP 2: Find Files ────────────────────────────────────
-    files = sorted(glob.glob(os.path.join(DATA_FOLDER, "*.json")))
+    files = sorted(glob.glob(str(DATA_FOLDER / "*.json")))
     if not files:
         print(f"\n❌ No JSON files found in: {DATA_FOLDER}")
-        print("   Make sure DATA_FOLDER points to your processed checkpoint outputs.")
+        print("   Check that PROCESSED_GRAPH_DIR points to the processed checkpoints.")
         ingester.close()
         return
 
@@ -100,10 +107,13 @@ def main():
         )
 
     # ── STEP 6: Graph Analytics ───────────────────────────────
-    print("\n📊 STEP 6: Running graph analytics...")
-    print("   - PageRank → risk_rank (identifies high-centrality entities)")
-    print("   - Louvain  → community_id (detects corporate clusters)")
-    ingester.run_analytics(algorithms=["risk", "communities"])
+    if SKIP_ANALYTICS:
+        print("\nSTEP 6: Skipping graph analytics (SKIP_ANALYTICS=true).")
+    else:
+        print("\n📊 STEP 6: Running graph analytics...")
+        print("   - PageRank → risk_rank (identifies high-centrality entities)")
+        print("   - Louvain  → community_id (detects corporate clusters)")
+        ingester.run_analytics(algorithms=["risk", "communities"])
 
     ingester.close()
 

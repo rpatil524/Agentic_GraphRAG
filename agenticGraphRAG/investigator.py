@@ -1,17 +1,18 @@
-import os
+"""Tool-mediated analytical agent for the SHAB Neo4j knowledge graph."""
+
 import json
 import requests
 import re
 from datetime import datetime
 
+from neo4j import READ_ACCESS
+
 class SHABInvestigator:
-	"""
-	The Semantic Agent Engine for the SHAB Network.
-	Uses Tool Calling, Reflexion, and Secure Sandboxed Analytics.
-	"""
-	def __init__(self, driver, api_key, model="gpt-4o-mini", iterations=4, database=None):
+	"""Route questions, execute graph tools, and synthesize grounded answers."""
+
+	def __init__(self, driver, api_key, model="gpt-4o-mini-2024-07-18", iterations=4, database="shabdb"):
 		self.driver = driver
-		self.api_key = api_key
+		self.api_key = api_key.strip("\"' ") if api_key else None
 		self.model = model
 		self.iterations = iterations
 		self.database = database
@@ -176,7 +177,12 @@ class SHABInvestigator:
 		]
 
 	def _call_llm(self, messages, temperature=0.0, tools=None):
-		"""Helper to call OpenAI API via requests, now supporting Tool Calling"""
+		"""Call the configured OpenAI model, optionally with restricted tools."""
+		if not self.api_key:
+			return {
+				"role": "assistant",
+				"content": "Error calling LLM: OPENAI_API_KEY is not configured.",
+			}
 		headers = {
 			"Content-Type": "application/json",
 			"Authorization": f"Bearer {self.api_key}"
@@ -202,7 +208,10 @@ class SHABInvestigator:
 	def execute_query(self, cypher_query, params=None):
 		"""Retriever. Runs the Cypher query."""
 		try:
-			with self.driver.session(database=self.database) as session:
+			with self.driver.session(
+				database=self.database,
+				default_access_mode=READ_ACCESS,
+			) as session:
 				result = session.run(cypher_query, params or {})
 				return [r.data() for r in result]
 		except Exception as e:
@@ -228,13 +237,23 @@ class SHABInvestigator:
 			return paginated
 		return results
 
+	@staticmethod
+	def _bounded_pagination(limit, offset, default):
+		"""Validate model-supplied pagination before passing it to Neo4j."""
+		try:
+			limit = int(limit)
+			offset = int(offset)
+		except (TypeError, ValueError) as exc:
+			raise ValueError("Pagination values must be integers.") from exc
+		return max(1, min(limit or default, 25)), max(0, offset)
+
 	def search_companies(self, name=None, uid=None, location=None, purpose=None, limit=15, offset=0):
-		limit = min(int(limit), 25)
+		limit, offset = self._bounded_pagination(limit, offset, 15)
 		conditions = []
 		# FETCH ONE EXTRA to detect if there are more pages
 		params = {
 			"limit": limit + 1,
-			"offset": int(offset)
+			"offset": offset
 		}
 		
 		conditions.append("(n:Company OR n:Person)")
@@ -282,10 +301,12 @@ class SHABInvestigator:
 		SKIP $offset LIMIT $limit
 		"""
 		results = self.execute_query(cypher, params)
-		return self._paginate_results(results, limit, int(offset))
+		return self._paginate_results(results, limit, offset)
 
 	def global_text_search(self, query, limit=20, offset=0):
-		limit = min(int(limit), 25)
+		limit, offset = self._bounded_pagination(limit, offset, 20)
+		if not str(query).strip():
+			return [{"error": "A nonempty text-search query is required."}]
 		lucene_query = " ".join([f"+{word}" for word in query.split()])
 
 		cypher = """
@@ -339,10 +360,17 @@ class SHABInvestigator:
 	def count_entities_by_event(self, event_type, entity_type="Company", keyword=None, location=None, limit=10, offset=0):
 		# This one is tricky because of 'collect'. We apply limit inside the collect logic usually.
 		# For simplicity, we just pass the raw limit here as it returns a 'sample' list, not a full paginated set usually.
+		allowed_events = {"bankruptcy", "liquidation", "new_foundation", "all"}
+		allowed_entities = {"Company", "Person"}
+		if event_type not in allowed_events:
+			return [{"error": f"Unsupported event type: {event_type}"}]
+		if entity_type not in allowed_entities:
+			return [{"error": f"Unsupported entity type: {entity_type}"}]
+		limit, offset = self._bounded_pagination(limit, offset, 10)
 		conditions = []
 		params = {
-			"limit": min(int(limit), 25),
-			"offset": int(offset)
+			"limit": limit,
+			"offset": offset,
 		}
 
 		if event_type == "bankruptcy":
@@ -387,12 +415,21 @@ class SHABInvestigator:
 		return self.execute_query(cypher, params)
 
 	def explore_network(self, uid=None, person_name=None, filter_entity_type="All", connection_type="all", limit=15, offset=0):
-		limit = min(int(limit), 25)
+		allowed_entity_filters = {"Company", "Person", "All"}
+		allowed_connection_types = {
+			"owners", "founders", "liquidators", "bankruptcy",
+			"structure", "mergers", "all",
+		}
+		if filter_entity_type not in allowed_entity_filters:
+			return [{"error": f"Unsupported entity filter: {filter_entity_type}"}]
+		if connection_type not in allowed_connection_types:
+			return [{"error": f"Unsupported connection type: {connection_type}"}]
+		limit, offset = self._bounded_pagination(limit, offset, 15)
 		
 		# FETCH ONE EXTRA for pagination detection
 		params = {
 			"limit": limit + 1,
-			"offset": int(offset),
+			"offset": offset,
 			"filter": filter_entity_type
 		}
 
@@ -523,7 +560,7 @@ class SHABInvestigator:
 			AND NOT coalesce(connected.is_weak, false) = true
 			AND ($filter = 'All' OR $filter IN labels(connected))
 
-			// NEW: Find Context (Company) for the event to answer "Where?"
+			// Include the connected company as event context.
 			OPTIONAL MATCH (e)--(ctx:Company)
 			
 			RETURN DISTINCT
@@ -648,17 +685,17 @@ class SHABInvestigator:
 			# Insert instruction notes at the top so they are never paginated out.
 			final_results = notes + final_results
 
-			return self._paginate_results(final_results, limit, int(offset))
+			return self._paginate_results(final_results, limit, offset)
 		
 		else:
 			 return [{"error": "Must provide either uid or person_name"}]
 
 	def get_node_history(self, uid, limit=15, offset=0):
-		limit = min(int(limit), 25)
+		limit, offset = self._bounded_pagination(limit, offset, 15)
 		params = {
 			"uid": uid,
 			"limit": limit + 1, # Fetch one extra
-			"offset": int(offset)
+			"offset": offset
 		}
 		# RETURN DISTINCT anchor.name AS entity_name, e.uid AS event_uid, e.date AS date, e.rubric AS rubric, e.sub_rubric AS sub_rubric, e.text AS text
 		cypher = """
@@ -671,12 +708,15 @@ class SHABInvestigator:
 		SKIP $offset LIMIT $limit
 		"""
 		results = self.execute_query(cypher, params)
-		return self._paginate_results(results, limit, int(offset))
+		return self._paginate_results(results, limit, offset)
 
 	def get_top_entities(self, entity_type="Company", metric="event_count", limit=15, location=None, keyword=None, offset=0):
-		limit = min(int(limit), 25)
+		if entity_type not in {"Company", "Person"}:
+			return [{"error": f"Unsupported entity type: {entity_type}"}]
+		if metric not in {"event_count", "risk_rank", "capital_nominal"}:
+			return [{"error": f"Unsupported ranking metric: {metric}"}]
+		limit, offset = self._bounded_pagination(limit, offset, 15)
 		# Fetch one extra
-		offset = int(offset)
 		conditions = []
 		params = {}
 
@@ -725,17 +765,22 @@ class SHABInvestigator:
 			SKIP {offset} LIMIT {limit + 1}
 			"""
 
-			print(cypher)
-			
 		results = self.execute_query(cypher, params)
 		return self._paginate_results(results, limit, int(offset))
 
 	def execute_custom_cypher(self, cypher_query):
 		upper_query = cypher_query.upper()
-		blocked_keywords = r'\b(CREATE|DELETE|SET|REMOVE|MERGE|DROP|CALL|DETACH)\b'
+		blocked_keywords = (
+			r'\b(CREATE|DELETE|SET|REMOVE|MERGE|DROP|CALL|DETACH|FOREACH|'
+			r'LOAD\s+CSV|ALTER|GRANT|DENY|REVOKE|TERMINATE|START|STOP)\b'
+		)
 		if re.search(blocked_keywords, upper_query):
 			return [{"error": "SECURITY BLOCK: The query contains restricted mutation keywords. Only read-operations are allowed."}]
-		if "LIMIT " not in upper_query:
+		if ";" in cypher_query:
+			return [{"error": "SECURITY BLOCK: Multiple Cypher statements are not allowed."}]
+		if not re.match(r"^\s*(MATCH|OPTIONAL\s+MATCH|WITH|UNWIND|RETURN|SHOW)\b", upper_query):
+			return [{"error": "SECURITY BLOCK: Custom Cypher must begin with a read-only clause."}]
+		if not re.search(r"\bLIMIT\s+\d+\b", upper_query):
 			cypher_query += "\nLIMIT 50"
 		return self.execute_query(cypher_query)
 
@@ -759,55 +804,10 @@ class SHABInvestigator:
 			if intent in ["search_companies", "explore_network", "get_node_history", "analytics"]:
 				return intent
 			return "all"
-		except:
+		except Exception:
 			return "all"
 
 	def ask(self, user_question, current_uid=None, chat_history=None, trace_callback=None):
-		# --- UPDATED PROMPT: STRICT PAGINATION & NO PREMATURE TEXT SEARCH ---
-		# agent_prompt = """You are an expert Forensic Investigator analyzing the Swiss Commercial Register.
-
-		# INTERACTION FLOW (STRICT):
-		# 1. **Identification (Start Here)**: Always begin by using `search_companies` to find the entity.
-		# - **FALLBACK RULE**: If result is empty, YOU MUST IMMEDIATELY use `global_text_search` in the same turn (with disclaimer "Results derived from unstructured text analysis").
-		# - **WEAK NODE RULE**: If a result has `is_weak=True` (e.g. "weak_..."), DO NOT display it. Instead, AUTOMATICALLY use `explore_network` on that UID to find connected real companies, and display those.
-		# - **FOLLOW-UP RULE**: After showing Step 1 results, YOU MUST ASK: "Do you want to explore the network connections (If yes, use `explore_network`), or the history of the company (If yes, use `get_node_history`)?"
-		# 2. **Dynamic Exploration (Cross-Prompting)**: Based on the user's choice in Step 1, display the results and always ask about the option that has *not yet been shown*:
-		# - If you just used `explore_network` to show the network, YOU MUST ASK: "Do you want to see the history of the company?" (If yes, use `get_node_history`).
-		# - If you just used `get_node_history` to show the history, YOU MUST ASK: "Do you want to explore the network connections?" (If yes, use `explore_network`).
-		# 3. **Text Deep Dive (Final Step)**: Once both the network and history have been explored (or if the user declines further node exploration), YOU MUST ASK: "Do you want me to go deeper and perform a text-based research?" (If yes, use `global_text_search` as a LAST RESORT).
-
-		# PRESENTATION RULES (DUAL-MODE):
-		# - **DOSSIER MODE (1 Result)**:
-		# - Display a **Detailed Card** (Name, Purpose, Address). **NO UIDs**.
-		# - **CRITICAL**: Ask about **History** or **Network**.
-
-		# - **LIST MODE (>1 Results)**:
-		# - Display a **Markdown Table**. **COLUMNS**: Select columns RELEVANT to the user's question. Always include **Name** and **Location**.
-		# 	- *Example*: If user asks about "capital", show "Name | Location | Capital".
-		# 	- *Example*: If user asks about "network" or "involvement", show "Name | Role | Company Context".
-		# 	- *Default*: "Name | Location | Purpose | Role".
-		# - **STRICT RULE**: You MUST display EVERY SINGLE result returned by the tool in your table. Do not sample, truncate, or skip items. If the tool returns 20 records, your table MUST contain exactly 20 rows!
-		# - **NO UIDs**.
-		# - **PAGINATION**: "Showing results [offset+1] - [offset+limit]. Would you like to see the next [limit]?"
-
-		# PAGINATION PROTOCOL (MANDATORY):
-		# - **STATE TRACKING**: You must track the `offset` of your last tool call.
-		# - **NEXT PAGE**: If user says "more" or "next page":
-		# 1. **SAME TOOL**: You MUST call the EXACT SAME tool as the previous turn (e.g., if you used `get_top_entities`, use it again). Do NOT switch to `get_node_history` or `explore_network`.
-		# 2. **CALCULATION**: New `offset` = Old `offset` + `limit`. (e.g., 0 -> 15 -> 30).
-		# 3. **EXECUTION**: Call the same tool with the new offset.
-
-		# GENERAL RULES:
-		# - **LIMIT RULE**: If the user requests a specific number of results, you MUST set the `limit` parameter to that number (up to a maximum of 25). If they request > 25, set limit=25 and explicitly state in your text response that you can only return a maximum of 25 elements per query.
-		# - **EFFICIENCY RULE**: When asked "Who is [Person] involved with?", use `explore_network(person_name='...')` **ONCE** with `filter_entity_type='Person'`. Do **NOT** look up companies first and then loop. The tool manages the multi-hop lookup.
-		# - **NO UIDs**: Never show the 'uid' or 'id' field in the final output.
-		# - **EVENT HISTORY**: When showing history, **SUMMARIZE** the `text` field into an informative paragraph (2-3 sentences). Do not paste raw text.
-		# - **FACTS ONLY**: List entities exactly as returned (unless resolving weak nodes).
-		# """
-
-		# context_str = f"\nCONTEXT: The user is currently looking at node UID='{current_uid}'." if current_uid else ""
-		# messages = [{"role": "system", "content": agent_prompt + context_str}]
-	
 		agent_prompt = """You are an expert Forensic Investigator analyzing the Swiss Commercial Register.
 
 			INTERACTION FLOW AND NUDGING (STRICT STATE MACHINE):
@@ -856,7 +856,6 @@ class SHABInvestigator:
 			- **EVENT HISTORY**: When showing history, **SUMMARIZE** the `text` field into an informative paragraph (2-3 sentences). Do not paste raw text.
 			- **FACTS ONLY**: List entities exactly as returned (unless resolving weak nodes).
 			"""
-			# - **WEAK NODE RULE**: If a result has `is_weak=True` (e.g. "weak_..."), DO NOT display it. Instead, AUTOMATICALLY use `explore_network` on that UID to find connected real companies, and display those.
 		if current_uid:
 			# Infer prior state from the user's chat history intents
 			has_network = False
@@ -1122,6 +1121,8 @@ class SHABInvestigator:
 								)
 								if name_lookup:
 									args["query"] = name_lookup[0]["query"]
+						if not tool_is_active(tool_name):
+							raise ValueError(f"Tool is not active for this routed request: {tool_name}")
 						func = getattr(self, tool_name)
 						result_data = func(**args)
 					

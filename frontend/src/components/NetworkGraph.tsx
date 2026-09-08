@@ -1,40 +1,62 @@
 "use client";
 import React, { useEffect, useRef } from "react";
 import dynamic from 'next/dynamic';
-import { ForceGraphMethods } from "react-force-graph-2d";
+import type {
+    ForceGraphMethods,
+    ForceGraphProps,
+    GraphData,
+    NodeObject,
+} from "react-force-graph-2d";
 import { apiUrl } from "../lib/api";
+import type { Entity, GraphLink, GraphNode } from "../lib/types";
 
 // Next.js SSR fix for react-force-graph-2d since it relies on browser 'window'
-const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
+const DynamicForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
+const ForceGraph2D = DynamicForceGraph2D as React.ForwardRefExoticComponent<
+    ForceGraphProps<GraphNode, GraphLink> &
+    React.RefAttributes<ForceGraphMethods<GraphNode, GraphLink>>
+>;
 
-interface Node {
-    id: string;
-    group: number;
-    name?: string;
-    label?: string;
+interface NetworkGraphProps {
+    uid: string;
+    setSelectedEntity?: (entity: Entity) => void;
 }
 
-export default function NetworkGraph({ uid, setSelectedEntity }: { uid: string, setSelectedEntity?: (entity: any) => void }) {
-    const [data, setData] = React.useState({ nodes: [], links: [] });
-    const [loading, setLoading] = React.useState(true);
-    const [selectedNode, setSelectedNode] = React.useState<Node | null>(null);
+interface LoadedGraph {
+    uid: string;
+    data: GraphData<GraphNode, GraphLink>;
+}
+
+const EMPTY_GRAPH: GraphData<GraphNode, GraphLink> = { nodes: [], links: [] };
+
+export default function NetworkGraph({ uid, setSelectedEntity }: NetworkGraphProps) {
+    const [loadedGraph, setLoadedGraph] = React.useState<LoadedGraph | null>(null);
+    const [selectedNode, setSelectedNode] = React.useState<NodeObject<GraphNode> | null>(null);
     const [graphWidth, setGraphWidth] = React.useState(800);
-    // @ts-ignore - The types from react-force-graph don't export ForceGraphMethods properly sometimes, we'll bypass the strict check
-    const graphRef = useRef<any>(null);
+    const graphRef = useRef<ForceGraphMethods<GraphNode, GraphLink> | null>(null);
+    const data = loadedGraph?.uid === uid ? loadedGraph.data : EMPTY_GRAPH;
+    const loading = loadedGraph?.uid !== uid;
 
     useEffect(() => {
         if (!uid) return;
-        setLoading(true);
+        const controller = new AbortController();
         fetch(apiUrl(`/api/entity/${uid}/graph`))
-            .then(res => res.json())
-            .then(d => {
-                setData(d);
-                setLoading(false);
+            .then((res) => {
+                if (!res.ok) throw new Error(`Graph request failed with status ${res.status}`);
+                return res.json() as Promise<GraphData<GraphNode, GraphLink>>;
             })
-            .catch(e => {
-                console.error("Error fetching graph data:", e);
-                setLoading(false);
+            .then((responseData) => {
+                if (!controller.signal.aborted) {
+                    setLoadedGraph({ uid, data: responseData });
+                }
+            })
+            .catch((error: unknown) => {
+                if (!controller.signal.aborted) {
+                    console.error("Error fetching graph data:", error);
+                    setLoadedGraph({ uid, data: EMPTY_GRAPH });
+                }
             });
+        return () => controller.abort();
     }, [uid]);
 
     useEffect(() => {
@@ -61,7 +83,7 @@ export default function NetworkGraph({ uid, setSelectedEntity }: { uid: string, 
         };
     }, []);
 
-    const getNodeColor = (node: any) => {
+    const getNodeColor = (node: NodeObject<GraphNode>) => {
         if (node.id === uid) return "#ef4444"; // Red for target
         switch (node.group) {
             case 1: return "#3b82f6"; // Company - Blue
@@ -86,7 +108,7 @@ export default function NetworkGraph({ uid, setSelectedEntity }: { uid: string, 
                 linkColor={() => "rgba(167, 139, 250, 0.4)"} // Purple-ish links
                 linkDirectionalArrowLength={3.5}
                 linkDirectionalArrowRelPos={1}
-                onNodeClick={(node: any) => setSelectedNode(node)}
+                onNodeClick={(node) => setSelectedNode(node)}
                 onEngineStop={() => {
                     if (graphRef.current) {
                         graphRef.current.zoomToFit(400, 20);

@@ -1,21 +1,21 @@
-# Constants used across the SHAB library
+"""Shared configuration for SHAB graph construction."""
 
-KEEP_RUBRICS = ['HR', 'KK', 'ES', 'EK']
+# Rubric families retained for the structured graph skeleton.
+SKELETON_RUBRICS = ("HR", "KK", "LS")
 
-# --- NEW CONFIGURATION CONSTANTS ---
+# High-value event types enriched with LLM-extracted weak nodes.
+LLM_TARGET_SUBRUBRICS = (
+    "HR01",  # New company registrations
+    "KK02",  # Bankruptcy proceedings
+    "KK03",  # Bankruptcy proceedings
+    "KK06",  # Bankruptcy proceedings
+    "LS01",  # Liquidations
+    "LS02",  # Liquidations
+)
 
-# Scope A: The Skeleton (Structure)
-# We keep these so the graph has structure (e.g. parents, deletions)
-SKELETON_RUBRICS = ['HR', 'KK', 'LS']
-
-# Scope B: The LLM Targets (Enrichment)
-# We only pay to enrich these high-value events.
-LLM_TARGET_SUBRUBRICS = [
-    'HR01',          # New Companies (Founders)
-    'KK02', 'KK03', 'KK06', # Bankruptcy (Liquidators)
-    'LS01', 'LS02'   # Liquidation (Liquidators)
-]
+# Legacy export retained for callers that imported KEEP_RUBRICS.
+KEEP_RUBRICS = SKELETON_RUBRICS
 
 PUBLISHER_STOPLIST = {
-    'SHAB', 'SOGC', 'FOSC', 'KAB', 'KANT', 'AMTSBLATT'
+    "SHAB", "SOGC", "FOSC", "KAB", "KANT", "AMTSBLATT"
 }

@@ -11,7 +11,7 @@ import argparse
 import asyncio
 import os
 
-from _bootstrap import ensure_paths, output_dir
+from _bootstrap import REPO_ROOT, ensure_paths, output_dir
 
 ensure_paths()
 
@@ -31,7 +31,7 @@ from tier3_regas_human_dataset import (
 
 AUTOMATED_DATASET_PATH = os.getenv(
     "AUTOMATED_DATASET_PATH",
-    "evaluation/datasets/automated_dataset.json",
+    str(REPO_ROOT / "evaluation" / "datasets" / "automated_dataset.json"),
 )
 AUTOMATED_AGENT_OUTPUT = str(output_dir() / "tier2_trajectory_results.json")
 AUTOMATED_BASELINE_OUTPUT = str(output_dir() / "baseline_results.json")
@@ -117,6 +117,9 @@ async def main():
         help="Path to the human benchmark JSON file.",
     )
     args = parser.parse_args()
+
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY is required for Tier 3 generation and judging.")
 
     if args.dataset in {"automated", "both"}:
         await run_automated(limit=args.limit, concurrency=args.concurrency)

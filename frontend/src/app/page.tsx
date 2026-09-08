@@ -3,20 +3,22 @@ import { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import Dashboard from '../components/Dashboard';
 import AgentChat from '../components/AgentChat';
+import type { Entity } from '../lib/types';
+
+type Theme = 'dark' | 'light';
+
+function initialTheme(): Theme {
+  if (typeof window === 'undefined') return 'dark';
+  const savedTheme = window.localStorage.getItem('theme');
+  return savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark';
+}
 
 export default function Home() {
-  const [selectedEntity, setSelectedEntity] = useState<any>(null);
+  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isChatExpanded, setIsChatExpanded] = useState(false);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-
-  useEffect(() => {
-    const savedTheme = window.localStorage.getItem('theme');
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      setTheme(savedTheme);
-    }
-  }, []);
+  const [theme, setTheme] = useState<Theme>(initialTheme);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -41,7 +43,6 @@ export default function Home() {
           <Sidebar
             onSelectEntity={setSelectedEntity}
             onGlobalSearch={() => setSelectedEntity(null)}
-            selectedEntity={selectedEntity}
           />
         </div>
       </div>

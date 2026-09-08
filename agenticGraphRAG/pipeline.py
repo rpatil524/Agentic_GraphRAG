@@ -1,11 +1,13 @@
-import pandas as pd
-import tqdm
+"""Three-stage construction pipeline for the SHAB knowledge graph."""
+
 import json
+from pathlib import Path
+
+import pandas as pd
+
 from .models import SHABCompany, SHABPerson, SHABEvent, SHABEdge
-from .extractors import real_llm_extractor, mock_llm_extractor
-# Updated import to include new constants
 from .constants import PUBLISHER_STOPLIST, SKELETON_RUBRICS, LLM_TARGET_SUBRUBRICS
-from .utils import clean_text, generate_hub_key
+from .utils import generate_hub_key
 
 class SHABPipeline:
 	def __init__(self, api_key=None):
@@ -15,6 +17,26 @@ class SHABPipeline:
 		self.name_hub = {}        
 		self.edge_objects = []
 		self.api_key = api_key
+
+	@staticmethod
+	def _upsert_node(store, node_id, node):
+		"""Merge a repeated entity record without replacing known values with nulls."""
+		existing = store.get(node_id)
+		if existing is None:
+			store[node_id] = node
+			return
+
+		merged = dict(existing)
+		merged_properties = dict(existing.get('properties', {}))
+		for key, value in node.get('properties', {}).items():
+			if value is None or (isinstance(value, float) and pd.isna(value)):
+				continue
+			if isinstance(value, str) and not value.strip():
+				continue
+			merged_properties[key] = value
+		merged.update({key: value for key, value in node.items() if key != 'properties'})
+		merged['properties'] = merged_properties
+		store[node_id] = merged
 
 	@staticmethod
 	def scan_rubric_statistics(folder_path):
@@ -97,15 +119,19 @@ class SHABPipeline:
 
 	def link_to_name_hub(self, entity_id, raw_name, clean_name_key):
 		"""
-		Creates the Name Node if missing, and links the Entity to it.
-		Schema: (:Person)-[:HAS_NAME]->(:Name)
+		Create a NameHub if missing and link the entity through HAS_NAME.
 		"""
+		if not entity_id or clean_name_key == 'unknown' or pd.isna(raw_name):
+			return
+		if not str(raw_name).strip():
+			return
+
 		# 1. Create/Get Name Node (The Hub)
 		hub_id = f"name_{clean_name_key}"
 		if clean_name_key not in self.name_hub:
 			self.name_hub[clean_name_key] = {
 				'id': hub_id,
-				'label': 'Name',
+				'label': 'NameHub',
 				'properties': {'value': raw_name}
 			}
 		
@@ -122,19 +148,18 @@ class SHABPipeline:
 		"""
 		# print("Processing Phase 1: CSV Rows (Strong Nodes)...")
 		
-		for index, row in df.iterrows():
+		for _, row in df.iterrows():
 			# 1. Process Strong Company
 			comp = SHABCompany.from_row(row)
 			if comp:
-				self.companies[comp.uid] = comp.to_dict()
-				# Use generate_hub_key instead of clean_text
+				self._upsert_node(self.companies, comp.uid, comp.to_dict())
 				clean_comp_name = generate_hub_key(comp.name) 
 				self.link_to_name_hub(comp.uid, comp.name, clean_comp_name)
 				
 			# 2. Process Strong Person
 			pers = SHABPerson.from_row(row)
 			if pers:
-				self.people[pers.id] = pers.to_dict()
+				self._upsert_node(self.people, pers.id, pers.to_dict())
 				
 				# Link Strong Person to Name Hub
 				if pers.name_key:
@@ -142,9 +167,10 @@ class SHABPipeline:
 					
 			# 3. Process Event
 			evt = SHABEvent(row)
-			self.events.append(evt.to_dict())
+			if pd.notna(evt.pub_id) and str(evt.pub_id).strip():
+				self.events.append(evt.to_dict())
 
-	def run_phase_2_unstructured_ingestion(self, use_mock=False, batch_size=10, subset_events=None):
+	def run_phase_2_unstructured_ingestion(self, batch_size=10, subset_events=None):
 		"""
 		Phase 2: LLM Extraction
 		Args:
@@ -160,14 +186,10 @@ class SHABPipeline:
 
 		# print(f"Processing Phase 2: LLM Extraction on {len(target_list)} events (Batch Size: {batch_size})...")
 		
-		if use_mock:
-			iterator = self.events
-			for evt in iterator:
-				entities = mock_llm_extractor(evt['id'], evt['properties']['full_text'])
-				self._process_extracted_entities(evt['id'], entities, is_mock=True)
-			return
+		if not self.api_key:
+			raise RuntimeError("OPENAI_API_KEY is required for weak-node extraction.")
 
-		# --- Real LLM Batch Processing with Adaptive Retry ---
+		# Real LLM batch processing with adaptive retry.
 		from .extractors import batch_real_llm_extractor_openai
 		
 		# --- 1. Define the Recursive Safety Wrapper ---
@@ -200,11 +222,13 @@ class SHABPipeline:
 				# Merge results dictionaries
 				return {**results_left, **results_right}
 			
-			# D. Poison Pill
-			# If we are down to 1 item and it still fails, log and skip it.
+			# Do not save a checkpoint with an unrecorded extraction gap. Raising
+			# here leaves the folder pending so a later run can retry it.
 			if len(current_batch) == 1:
 				bad_id = current_batch[0]['id']
-				print(f"   [❌] Item {bad_id} completely failed LLM processing.")
+				raise RuntimeError(
+					f"Weak-node extraction failed for Event {bad_id} after batch splitting."
+				)
 			
 			return {}
 
@@ -227,9 +251,9 @@ class SHABPipeline:
 			for item in batch:
 				event_id = item['id']
 				entities = batch_results.get(event_id, [])
-				self._process_extracted_entities(event_id, entities, is_mock=False)
+				self._process_extracted_entities(event_id, entities)
 
-	def _process_extracted_entities(self, event_id, extracted_entities, is_mock=False):
+	def _process_extracted_entities(self, event_id, extracted_entities):
 		"""Helper to create nodes and edges from raw entities"""
 		# Guard: entities must be a list of dicts, not a string/None/etc.
 		if not isinstance(extracted_entities, list):
@@ -238,7 +262,7 @@ class SHABPipeline:
 			if not isinstance(entity, dict):
 				continue
 			try:
-				# [SAFETY FIX] Skip Publishers immediately
+				# Publisher names are not registry actors.
 				if entity['name'].upper() in PUBLISHER_STOPLIST:
 					continue
 
@@ -246,7 +270,7 @@ class SHABPipeline:
 
 				if entity['type'] == 'Person':
 					weak_pers = SHABPerson.from_text(entity['name'], event_id)
-					self.people[weak_pers.id] = weak_pers.to_dict()
+					self._upsert_node(self.people, weak_pers.id, weak_pers.to_dict())
 					
 					if weak_pers.name_key:
 						self.link_to_name_hub(weak_pers.id, weak_pers.name, weak_pers.name_key)
@@ -255,8 +279,7 @@ class SHABPipeline:
 				elif entity['type'] == 'Organization':
 					weak_comp = SHABCompany.from_text(entity['name'], event_id)
 					if weak_comp.uid not in self.companies:
-						self.companies[weak_comp.uid] = weak_comp.to_dict()
-						# Use generate_hub_key instead of clean_text
+						self._upsert_node(self.companies, weak_comp.uid, weak_comp.to_dict())
 						clean_name_comp = generate_hub_key(weak_comp.name)
 						self.link_to_name_hub(weak_comp.uid, weak_comp.name, clean_name_comp)
 					source_id = weak_comp.uid
@@ -269,7 +292,7 @@ class SHABPipeline:
 						properties={
 							'role': entity['role'], 
 							'confidence': entity.get('confidence'),
-							'extraction_source': 'MOCK' if is_mock else 'LLM'
+								'extraction_source': 'LLM'
 						}
 					))
 
@@ -277,9 +300,12 @@ class SHABPipeline:
 				print(f"Error processing entity: {entity}")
 				print(e)
 
-	def run_phase_3_structured_edges(self):
+	def run_structured_edge_creation(self):
 		"""
-		Phase 3: Generate Structured Edges from Event connections
+		Create deterministic edges from structured Event connection fields.
+
+		This operation belongs to Phase 1 in the paper. Phase 3 identity
+		resolution is performed after checkpoint ingestion by Neo4jIngester.
 		"""
 		# print("Generating Structured Edges (Appending to existing graph)...")
 		
@@ -320,10 +346,12 @@ class SHABPipeline:
 							properties={'role': role}
 						))
 						count_new_edges += 1
-						
-		# print(f"✅ Added {count_new_edges} structured edges.")
-		# print(f"   Total Graph Edges: {len(self.edge_objects)}")
 
+		return count_new_edges
+
+	def run_phase_3_structured_edges(self):
+		"""Backward-compatible alias for ``run_structured_edge_creation``."""
+		return self.run_structured_edge_creation()
 	def save_checkpoint(self, filename="shab_graph_checkpoint.json"):
 		# print("Saving Graph Data to JSON...")
 		
@@ -338,7 +366,9 @@ class SHABPipeline:
 			"edges": serialized_edges
 		}
 		
-		with open(filename, 'w', encoding='utf-8') as f:
+		path = Path(filename)
+		path.parent.mkdir(parents=True, exist_ok=True)
+		with path.open('w', encoding='utf-8') as f:
 			json.dump(graph_dump, f, ensure_ascii=False, indent=2)
 			
 		# RETURN the stats so the script can print them

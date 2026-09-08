@@ -1,7 +1,7 @@
 {
     "dataset_name": "SHAB Conversational Golden Dataset",
-    "source_dataset": "evaluation/golden_dataset_human.json",
-    "total_conversations": 12,
+    "source_dataset": "evaluation/datasets/golden_dataset.json",
+    "total_conversations": 14,
     "conversations": [
         {
             "conversation_id": "C001",

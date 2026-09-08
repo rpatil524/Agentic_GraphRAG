@@ -1,8 +1,4 @@
-"""
-Tier 3 Evaluation: End-to-End Quality (RAGAS Framework Simulation)
-Evaluates the final answers produced by the Graph RAG agent against the Golden Dataset.
-Calculates Faithfulness, Answer Relevance, and Information Recall using an LLM-as-a-judge approach.
-"""
+"""Tier 3 RAGAS-inspired evaluation on the graph-seeded benchmark."""
 
 import json
 import os
@@ -22,6 +18,7 @@ class RagasEvaluator:
         if not self.api_key:
             raise RuntimeError("OPENAI_API_KEY is required.")
         self.client = AsyncOpenAI(api_key=self.api_key)
+        self.judge_model = os.getenv("OPENAI_JUDGE_MODEL", "gpt-5-2025-08-07")
         # Control how many parallel API calls to allow
         self.concurrency = concurrency
 
@@ -36,21 +33,26 @@ Output ONLY a float number.
 
 Context: {context}
 Answer: {answer}
-"""
+        """
         async with self.sem:
+            last_error = None
             for attempt in range(4):
                 try:
                     res = await self.client.chat.completions.create(
-                        model="gpt-5",
+                        model=self.judge_model,
                         messages=[{"role": "user", "content": prompt}]
                     )
-                    return float(res.choices[0].message.content.strip())
+                    score = float(res.choices[0].message.content.strip())
+                    if not 0.0 <= score <= 1.0:
+                        raise ValueError(f"Judge returned an out-of-range score: {score}")
+                    return score
                 except Exception as e:
+                    last_error = e
                     if "429" in str(e):
                         await asyncio.sleep(5 * (attempt + 1))
-                    else:
-                        break
-            return 0.8 # Fallback
+                    elif attempt < 3:
+                        await asyncio.sleep(attempt + 1)
+            raise RuntimeError("Faithfulness judging failed after four attempts.") from last_error
 
     async def evaluate_relevance(self, question, answer):
         """
@@ -63,21 +65,26 @@ Output ONLY a float number.
 
 Question: {question}
 Answer: {answer}
-"""
+        """
         async with self.sem:
+            last_error = None
             for attempt in range(4):
                 try:
                     res = await self.client.chat.completions.create(
-                        model="gpt-5",
+                        model=self.judge_model,
                         messages=[{"role": "user", "content": prompt}]
                     )
-                    return float(res.choices[0].message.content.strip())
+                    score = float(res.choices[0].message.content.strip())
+                    if not 0.0 <= score <= 1.0:
+                        raise ValueError(f"Judge returned an out-of-range score: {score}")
+                    return score
                 except Exception as e:
+                    last_error = e
                     if "429" in str(e):
                         await asyncio.sleep(5 * (attempt + 1))
-                    else:
-                        break
-            return 0.9 # Fallback
+                    elif attempt < 3:
+                        await asyncio.sleep(attempt + 1)
+            raise RuntimeError("Answer-relevance judging failed after four attempts.") from last_error
 
     async def evaluate_recall(self, expected, answer):
         """
@@ -89,21 +96,26 @@ Output ONLY a float number.
 
 Expected: {expected}
 Actual: {answer}
-"""
+        """
         async with self.sem:
+            last_error = None
             for attempt in range(4):
                 try:
                     res = await self.client.chat.completions.create(
-                        model="gpt-5",
+                        model=self.judge_model,
                         messages=[{"role": "user", "content": prompt}]
                     )
-                    return float(res.choices[0].message.content.strip())
+                    score = float(res.choices[0].message.content.strip())
+                    if not 0.0 <= score <= 1.0:
+                        raise ValueError(f"Judge returned an out-of-range score: {score}")
+                    return score
                 except Exception as e:
+                    last_error = e
                     if "429" in str(e):
                         await asyncio.sleep(5 * (attempt + 1))
-                    else:
-                        break
-            return 0.85 # Fallback
+                    elif attempt < 3:
+                        await asyncio.sleep(attempt + 1)
+            raise RuntimeError("Information-recall judging failed after four attempts.") from last_error
 
     async def process_item(self, item, is_baseline=False):
         q = item["question"]
@@ -127,20 +139,27 @@ Actual: {answer}
         """
         Executes the evaluation suite concurrently on the actual outputs.
         """
+        for label, path in (
+            ("GraphRAG", graph_results_path),
+            ("dense baseline", baseline_results_path),
+        ):
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"{label} results not found at {path}.")
+
         self.sem = asyncio.Semaphore(self.concurrency)
 
         metrics = {
             "Framework": "Graph RAG (SHAB Investigator)",
-            "Faithfulness": 0.0,
-            "Answer_Relevance": 0.0,
-            "Information_Recall": 0.0,
+            "Faithfulness": None,
+            "Answer_Relevance": None,
+            "Information_Recall": None,
             "Average_Latency": "N/A",
             "Total_Evaluated": 0,
 
-            "Baseline_Framework": "Naive Vector RAG",
-            "Baseline_Faithfulness": 0.0,
-            "Baseline_Answer_Relevance": 0.0,
-            "Baseline_Information_Recall": 0.0,
+            "Baseline_Framework": "Dense Vector-RAG",
+            "Baseline_Faithfulness": None,
+            "Baseline_Answer_Relevance": None,
+            "Baseline_Information_Recall": None,
             "Baseline_Average_Latency": "N/A",
             "Baseline_Total_Evaluated": 0
         }
@@ -151,6 +170,8 @@ Actual: {answer}
                 graph_data = json.load(f)
             
             trajectories = graph_data.get("trajectories", [])
+            if not trajectories:
+                raise ValueError(f"GraphRAG results contain no trajectories: {graph_results_path}")
             metrics["Average_Latency"] = graph_data.get("metrics", {}).get("Average_Latency", "N/A")
             
             print(f"Starting async RAGAS evaluation on {len(trajectories)} Graph RAG answers...")
@@ -190,6 +211,8 @@ Actual: {answer}
                 metrics["Baseline_Average_Latency"] = baseline_data_full.get("metrics", {}).get("Average_Latency", "N/A")
             else:
                 baseline_data = baseline_data_full
+            if not baseline_data:
+                raise ValueError(f"Dense baseline results contain no rows: {baseline_results_path}")
                 
             print(f"\nStarting async RAGAS evaluation on {len(baseline_data)} Baseline Vector RAG answers...")
             

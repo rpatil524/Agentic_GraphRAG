@@ -1,20 +1,19 @@
-import json
-import time
-import tqdm
-from neo4j import GraphDatabase
+"""Neo4j ingestion, identity resolution, analytics, and anonymization."""
+
 from collections import defaultdict
+import hashlib
+import hmac
+import json
+from pathlib import Path
+
+from neo4j import GraphDatabase
+import tqdm
+
 from .utils import generate_hub_key
 
 class Neo4jIngester:
-	"""
-	Handles bulk ingestion of SHAB JSON data into Neo4j.
-	Now includes:
-	1. Extended Company Properties (address, legal_form, etc.)
-	2. Event Text Fix (prioritizing 'full_text')
-	3. Built-in Analytics (PageRank & Louvain)
-	4. Entity Resolution (Deduplication of Weak Nodes)
-	"""
-	def __init__(self, uri, auth, database="neo4j"):
+	"""Load checkpoints and perform the paper's database-side processing."""
+	def __init__(self, uri, auth, database="shabdb"):
 		self.driver = GraphDatabase.driver(uri, auth=auth)
 		self.database = database
 		self.verify_connection()
@@ -22,9 +21,12 @@ class Neo4jIngester:
 	def verify_connection(self):
 		try:
 			self.driver.verify_connectivity()
+			# Connectivity alone does not verify that the configured database exists.
+			with self.driver.session(database=self.database) as session:
+				session.run("RETURN 1 AS ok").consume()
 			print(f"✅ Connected to Neo4j ({self.database})")
 		except Exception as e:
-			print(f"❌ Connection Failed: {e}")
+			print(f"❌ Could not connect to Neo4j database '{self.database}': {e}")
 			raise e
 
 	def close(self):
@@ -38,8 +40,7 @@ class Neo4jIngester:
 			"CREATE INDEX person_name  IF NOT EXISTS FOR (p:Person)  ON (p.name)",
 			"CREATE INDEX event_date   IF NOT EXISTS FOR (e:Event)   ON (e.date)",
 			
-			# --- NEW: GLOBAL SEARCH INDEX ---
-			# This enables "Google-style" search across names and raw text.
+			# Search across entity names, event text, and registry rubrics.
 			"CREATE FULLTEXT INDEX global_search IF NOT EXISTS FOR (n:BaseNode) ON EACH [n.name, n.text, n.rubric]"
 		]
 		with self.driver.session(database=self.database) as session:
@@ -49,9 +50,9 @@ class Neo4jIngester:
 
 	def deduplicate_name_hubs(self):
 		"""
-		Consolidates duplicate NameHubs (e.g., 'Martin Kauter' and 'Kauter Martin')
+		Consolidate duplicate NameHubs (e.g., 'Martin Kauter' and 'Kauter Martin')
 		by applying the alphabetized token sorting directly in the database.
-		Uses Cypher UNWIND for lightning-fast bulk processing.
+		Cypher UNWIND batches avoid one database transaction per hub.
 		"""
 		print("🔤 Deduplicating Name Hubs (Alphabetical Tokenization)...")
 		
@@ -109,15 +110,16 @@ class Neo4jIngester:
 
 	def resolve_weak_nodes(self):
 		"""
-		Cleans up the database by deleting redundant 'Weak' nodes that were
-		extracted by the LLM but already exist as 'Strong' nodes in the same event.
+		Remove weak nodes already represented by a strong node in the same event.
+
+		This is the original query used to construct the graph evaluated in the
+		paper. A weak node is removed when it shares both a NameHub and an Event
+		with a strong node.
 		"""
 		print("🧹 Running Entity Resolution (Deduplication)...")
-		# We generalize the query to work for both Companies and People.
-		# It finds any Weak node sharing a NameHub and an Event with a Strong node.
 		query = """
 		MATCH (weak {is_weak: True})-[:HAS_NAME]->(hub:NameHub)<-[:HAS_NAME]-(strong {is_weak: False})
-		MATCH (weak)-[r_weak:ACTED_IN]->(e:Event)<-[r_strong]-(strong)
+		MATCH (weak)-[r_weak:ACTED_IN]->(event:Event)<-[r_strong]-(strong)
 		WITH weak, r_weak
 		DELETE r_weak
 		DETACH DELETE weak
@@ -132,7 +134,7 @@ class Neo4jIngester:
 		except Exception as e:
 			print(f"❌ Error during entity resolution: {e}")
 
-	def run_analytics(self, algorithms=["risk", "communities"]):
+	def run_analytics(self, algorithms=("risk", "communities")):
 		"""
 		Runs Graph Data Science algorithms on the current data.
 		:param algorithms: List of algos to run. Options: 'risk' (PageRank), 'communities' (Louvain)
@@ -195,7 +197,7 @@ class Neo4jIngester:
 		with self.driver.session(database=self.database) as session:
 			# --- 1. NODES ---
 			
-			# Companies (With your extended fields)
+			# Companies
 			if data.get('companies'):
 				batch = []
 				for uid, props in data['companies'].items():
@@ -217,11 +219,17 @@ class Neo4jIngester:
 				session.run("""
 					UNWIND $batch AS row
 					MERGE (n:BaseNode {uid: row.uid})
-					SET n:Company, n.name = row.name, n.city = row.city,
-						n.address = row.address, n.legal_form = row.legal_form,
-						n.deletion_date = row.deletion_date, n.purpose = row.purpose,
-						n.capital_nominal = row.capital_nominal, n.capital_paid = row.capital_paid,
-						n.is_weak = row.is_weak, n.source = row.source
+					SET n:Company,
+						n.name = coalesce(row.name, n.name),
+						n.city = coalesce(row.city, n.city),
+						n.address = coalesce(row.address, n.address),
+						n.legal_form = coalesce(row.legal_form, n.legal_form),
+						n.deletion_date = coalesce(row.deletion_date, n.deletion_date),
+						n.purpose = coalesce(row.purpose, n.purpose),
+						n.capital_nominal = coalesce(row.capital_nominal, n.capital_nominal),
+						n.capital_paid = coalesce(row.capital_paid, n.capital_paid),
+						n.is_weak = coalesce(row.is_weak, n.is_weak),
+						n.source = coalesce(row.source, n.source)
 				""", batch=batch)
 
 			# People
@@ -242,9 +250,13 @@ class Neo4jIngester:
 				session.run("""
 					UNWIND $batch AS row
 					MERGE (n:BaseNode {uid: row.uid})
-					SET n:Person, n.name = row.name, n.origin = row.origin,
-						n.town = row.town, n.dob = row.dob,
-						n.is_weak = row.is_weak, n.source = row.source
+					SET n:Person,
+						n.name = coalesce(row.name, n.name),
+						n.origin = coalesce(row.origin, n.origin),
+						n.town = coalesce(row.town, n.town),
+						n.dob = coalesce(row.dob, n.dob),
+						n.is_weak = coalesce(row.is_weak, n.is_weak),
+						n.source = coalesce(row.source, n.source)
 				""", batch=batch)
 
 			# Events (With FULL_TEXT priority)
@@ -260,13 +272,23 @@ class Neo4jIngester:
 						'date': props.get('date'), 
 						'rubric': props.get('rubric'),
 						'sub_rubric': props.get('sub_rubric'),
-						'text': text_content
+						'canton': props.get('canton'),
+						'deadline': props.get('deadline'),
+						'changes': props.get('changes') or [],
+						'text': text_content,
 					})
 					
 				session.run("""
 					UNWIND $batch AS row
 					MERGE (n:BaseNode {uid: row.uid})
-					SET n:Event, n.date = row.date, n.rubric = row.rubric, n.text = row.text, n.sub_rubric = row.sub_rubric
+					SET n:Event,
+						n.date = coalesce(row.date, n.date),
+						n.rubric = coalesce(row.rubric, n.rubric),
+						n.sub_rubric = coalesce(row.sub_rubric, n.sub_rubric),
+						n.canton = coalesce(row.canton, n.canton),
+						n.deadline = coalesce(row.deadline, n.deadline),
+						n.changes = CASE WHEN size(row.changes) > 0 THEN row.changes ELSE n.changes END,
+						n.text = coalesce(row.text, n.text)
 				""", batch=batch)
 				
 			# Name Hubs
@@ -288,16 +310,27 @@ class Neo4jIngester:
 					src = edge.get('source_id') or edge.get('source')
 					tgt = edge.get('target_id') or edge.get('target')
 					raw_type = edge.get('relation_type') or edge.get('type') or "RELATED_TO"
-					safe_type = "".join(c for c in raw_type if c.isalnum() or c == "_").upper()
+					safe_type = "".join(c for c in raw_type if c.isalnum() or c == "_").upper() or "RELATED_TO"
+					raw_properties = edge.get('properties') or {}
+					properties = {
+						str(key): value
+						for key, value in raw_properties.items()
+						if value is not None
+					}
 					
 					if src and tgt:
-						edges_by_type[safe_type].append({'source': src, 'target': tgt})
+						edges_by_type[safe_type].append({
+							'source': src,
+							'target': tgt,
+							'properties': properties,
+						})
 
 				for rtype, batch in edges_by_type.items():
 					query = f"""
 						UNWIND $batch AS row
 						MATCH (s:BaseNode {{uid: row.source}}), (t:BaseNode {{uid: row.target}})
 						MERGE (s)-[r:{rtype}]->(t)
+						SET r += row.properties
 					"""
 					session.run(query, batch=batch)
 
@@ -307,10 +340,6 @@ class Neo4jIngester:
 		Updates 'name' and 'address' on BaseNodes, and 'text' on Events.
 		Saves a local JSON mapping of {hashed_value: original_value}.
 		"""
-		import hmac
-		import hashlib
-		import os
-
 		print("🔐 Anonymizing Graph (HMAC-SHA256)...")
 		if not secret_key:
 			print("❌ Secret key is empty, cannot anonymize.")
@@ -375,12 +404,14 @@ class Neo4jIngester:
 						n.text = coalesce(row.text, n.text)
 				""", chunk=chunk)
 
-		# Step 3: Save mapping
+		# The mapping reverses the pseudonymization and must remain private.
 		print(f"   - Saving translation mapping to {output_path}...")
 		try:
-			os.makedirs(os.path.dirname(output_path), exist_ok=True)
-			with open(output_path, 'w', encoding='utf-8') as f:
+			path = Path(output_path).expanduser()
+			path.parent.mkdir(parents=True, exist_ok=True)
+			with path.open('w', encoding='utf-8') as f:
 				json.dump(mapping, f, indent=2, ensure_ascii=False)
+			path.chmod(0o600)
 			print("✅ Anonymization complete.")
 		except Exception as e:
 			print(f"❌ Error saving translation mapping: {e}")

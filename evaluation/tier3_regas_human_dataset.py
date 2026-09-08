@@ -13,7 +13,7 @@ import tqdm
 from neo4j import GraphDatabase
 from openai import AsyncOpenAI
 
-from _bootstrap import ensure_paths, output_dir
+from _bootstrap import REPO_ROOT, ensure_paths, output_dir
 
 ensure_paths()
 
@@ -21,7 +21,9 @@ from baseline_rag.vector_rag import NaiveVectorRAG
 from agenticGraphRAG.investigator import SHABInvestigator
 
 
-DEFAULT_DATASET_PATH = "evaluation/datasets/golden_dataset.json"
+DEFAULT_DATASET_PATH = str(
+    REPO_ROOT / "evaluation" / "datasets" / "golden_dataset.json"
+)
 DEFAULT_AGENT_OUTPUT = str(output_dir() / "tier2_trajectory_human_results.json")
 DEFAULT_BASELINE_OUTPUT = str(output_dir() / "baseline_human_results.json")
 DEFAULT_RESULTS_OUTPUT = str(output_dir() / "tier3_regas_human_dataset_results.json")
@@ -32,7 +34,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 def load_human_dataset(dataset_path):
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(
-            f"Dataset {dataset_path} not found. Please run generate_human_dataset.py first."
+            f"Human benchmark not found at {dataset_path}."
         )
 
     with open(dataset_path, "r", encoding="utf-8") as f:
@@ -128,10 +130,13 @@ def run_agent_on_human_dataset(
     password = os.getenv("NEO4J_PASSWORD", "")
     if not password:
         raise RuntimeError("NEO4J_PASSWORD is required.")
+    database = os.getenv("NEO4J_DATABASE", "shabdb")
     api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is required for agent execution.")
 
     driver = GraphDatabase.driver(uri, auth=(user, password))
-    investigator = SHABInvestigator(driver=driver, api_key=api_key)
+    investigator = SHABInvestigator(driver=driver, api_key=api_key, database=database)
 
     results = []
     latencies = []
@@ -203,7 +208,10 @@ def run_agent_on_human_dataset(
 class HumanDatasetRagasEvaluator:
     def __init__(self, api_key=None, concurrency=15):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        if not self.api_key:
+            raise RuntimeError("OPENAI_API_KEY is required.")
         self.client = AsyncOpenAI(api_key=self.api_key)
+        self.judge_model = os.getenv("OPENAI_JUDGE_MODEL", "gpt-5-2025-08-07")
         self.concurrency = concurrency
         self.sem = asyncio.Semaphore(concurrency)
 
@@ -217,21 +225,26 @@ Output ONLY a float number.
 Question: {question}
 Expected Answer: {expected}
 Actual Answer: {answer}
-"""
+        """
         async with self.sem:
+            last_error = None
             for attempt in range(4):
                 try:
                     res = await self.client.chat.completions.create(
-                        model="gpt-5",
+                        model=self.judge_model,
                         messages=[{"role": "user", "content": prompt}],
                     )
-                    return float(res.choices[0].message.content.strip())
+                    score = float(res.choices[0].message.content.strip())
+                    if not 0.0 <= score <= 1.0:
+                        raise ValueError(f"Judge returned an out-of-range score: {score}")
+                    return score
                 except Exception as e:
+                    last_error = e
                     if "429" in str(e):
                         await asyncio.sleep(5 * (attempt + 1))
-                    else:
-                        break
-            return 0.8
+                    elif attempt < 3:
+                        await asyncio.sleep(attempt + 1)
+            raise RuntimeError("Correctness judging failed after four attempts.") from last_error
 
     async def evaluate_relevance(self, question, answer):
         prompt = f"""Given the question and the answer, compute an answer relevance score between 0.0 and 1.0.
@@ -240,21 +253,26 @@ Output ONLY a float number.
 
 Question: {question}
 Answer: {answer}
-"""
+        """
         async with self.sem:
+            last_error = None
             for attempt in range(4):
                 try:
                     res = await self.client.chat.completions.create(
-                        model="gpt-5",
+                        model=self.judge_model,
                         messages=[{"role": "user", "content": prompt}],
                     )
-                    return float(res.choices[0].message.content.strip())
+                    score = float(res.choices[0].message.content.strip())
+                    if not 0.0 <= score <= 1.0:
+                        raise ValueError(f"Judge returned an out-of-range score: {score}")
+                    return score
                 except Exception as e:
+                    last_error = e
                     if "429" in str(e):
                         await asyncio.sleep(5 * (attempt + 1))
-                    else:
-                        break
-            return 0.9
+                    elif attempt < 3:
+                        await asyncio.sleep(attempt + 1)
+            raise RuntimeError("Answer-relevance judging failed after four attempts.") from last_error
 
     async def evaluate_recall(self, expected, answer):
         prompt = f"""Compare the Expected Answer to the Actual Answer.
@@ -263,21 +281,26 @@ Output ONLY a float number.
 
 Expected: {expected}
 Actual: {answer}
-"""
+        """
         async with self.sem:
+            last_error = None
             for attempt in range(4):
                 try:
                     res = await self.client.chat.completions.create(
-                        model="gpt-5",
+                        model=self.judge_model,
                         messages=[{"role": "user", "content": prompt}],
                     )
-                    return float(res.choices[0].message.content.strip())
+                    score = float(res.choices[0].message.content.strip())
+                    if not 0.0 <= score <= 1.0:
+                        raise ValueError(f"Judge returned an out-of-range score: {score}")
+                    return score
                 except Exception as e:
+                    last_error = e
                     if "429" in str(e):
                         await asyncio.sleep(5 * (attempt + 1))
-                    else:
-                        break
-            return 0.85
+                    elif attempt < 3:
+                        await asyncio.sleep(attempt + 1)
+            raise RuntimeError("Information-recall judging failed after four attempts.") from last_error
 
     async def process_item(self, item, is_baseline=False):
         question = item["question"]
@@ -321,18 +344,25 @@ Actual: {answer}
         baseline_results_path=DEFAULT_BASELINE_OUTPUT,
         output_path=DEFAULT_RESULTS_OUTPUT,
     ):
+        for label, path in (
+            ("GraphRAG", graph_results_path),
+            ("dense baseline", baseline_results_path),
+        ):
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"{label} results not found at {path}.")
+
         metrics = {
             "Dataset": DEFAULT_DATASET_PATH,
             "Framework": "Graph RAG (SHAB Investigator)",
-            "Correctness": 0.0,
-            "Answer_Relevance": 0.0,
-            "Information_Recall": 0.0,
+            "Correctness": None,
+            "Answer_Relevance": None,
+            "Information_Recall": None,
             "Average_Latency": "N/A",
             "Total_Evaluated": 0,
-            "Baseline_Framework": "Naive Vector RAG",
-            "Baseline_Correctness": 0.0,
-            "Baseline_Answer_Relevance": 0.0,
-            "Baseline_Information_Recall": 0.0,
+            "Baseline_Framework": "Dense Vector-RAG",
+            "Baseline_Correctness": None,
+            "Baseline_Answer_Relevance": None,
+            "Baseline_Information_Recall": None,
             "Baseline_Average_Latency": "N/A",
             "Baseline_Total_Evaluated": 0,
         }
@@ -342,6 +372,8 @@ Actual: {answer}
                 graph_data = json.load(f)
 
             trajectories = graph_data.get("trajectories", [])
+            if not trajectories:
+                raise ValueError(f"GraphRAG results contain no trajectories: {graph_results_path}")
             metrics["Average_Latency"] = graph_data.get("metrics", {}).get(
                 "Average_Latency", "N/A"
             )
@@ -376,6 +408,8 @@ Actual: {answer}
                 baseline_data_full = json.load(f)
 
             baseline_data = baseline_data_full.get("results", [])
+            if not baseline_data:
+                raise ValueError(f"Dense baseline results contain no rows: {baseline_results_path}")
             metrics["Baseline_Average_Latency"] = baseline_data_full.get(
                 "metrics", {}
             ).get("Average_Latency", "N/A")

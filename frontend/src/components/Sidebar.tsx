@@ -1,10 +1,16 @@
 "use client";
 import React, { useState } from 'react';
 import { apiUrl } from '../lib/api';
+import type { Entity } from '../lib/types';
 
-export default function Sidebar({ onSelectEntity, onGlobalSearch, selectedEntity }: any) {
+interface SidebarProps {
+    onSelectEntity: (entity: Entity) => void;
+    onGlobalSearch: () => void;
+}
+
+export default function Sidebar({ onSelectEntity, onGlobalSearch }: SidebarProps) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [results, setResults] = useState<any[]>([]);
+    const [results, setResults] = useState<Entity[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
 
@@ -88,7 +94,7 @@ export default function Sidebar({ onSelectEntity, onGlobalSearch, selectedEntity
                     ))
                 ) : hasSearched ? (
                     <div className="p-4 bg-neutral-900/60 border border-neutral-800 rounded-xl flex flex-col gap-2 mt-4">
-                        <span className="text-neutral-400 font-semibold text-sm">No results found for <span className="text-purple-400">"{searchTerm}"</span></span>
+                        <span className="text-neutral-400 font-semibold text-sm">No results found for <span className="text-purple-400">&quot;{searchTerm}&quot;</span></span>
                         <span className="text-neutral-500 text-xs leading-relaxed">
                             This search only looks at entity names. Try the <span className="text-purple-400 font-semibold">❖ Global Agent</span> on the right — it can search across all text in the database and may find hidden mentions.
                         </span>

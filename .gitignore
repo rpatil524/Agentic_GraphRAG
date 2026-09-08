@@ -1,19 +1,37 @@
-# Keep JSON ignored by default in this package...
-*.json
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+!frontend/.env.example
 
-# ...but include the three benchmark datasets required for reproducibility.
-!evaluation/datasets/automated_dataset.json
-!evaluation/datasets/golden_dataset.json
-!evaluation/datasets/conversational_dataset.json
-
-# Common local build/runtime artifacts
+# Python artifacts
 __pycache__/
 *.pyc
-.DS_Store
-.env
 .venv/
 venv/
-frontend/node_modules/
-frontend/.next/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Generated data and evaluation artifacts
+shab_data/
+processed_data/
+evaluation/results/
+evaluation_outputs/
+results/
+*.jsonl
+*.log
+
+# The Chroma database is generated from Neo4j Event text.
 evaluation/baseline_rag/chroma_db/
 
+# Frontend artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/*.tsbuildinfo
+
+# Operating-system and editor artifacts
+.DS_Store
+.idea/
+.vscode/

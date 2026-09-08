@@ -1,52 +1,37 @@
-import pandas as pd
-import unicodedata
+"""Normalization helpers shared by ingestion and identity resolution."""
+
 import re
+import unicodedata
+
+import pandas as pd
 
 def clean_date(raw_date):
-	"""
-	Cleans a date string to return YYYY-MM-DD.
-	Returns None if the date is NA.
-	"""
-	if pd.isna(raw_date): 
+	"""Return the date portion of a value as ``YYYY-MM-DD`` when available."""
+	if pd.isna(raw_date):
 		return None
 	return str(raw_date)[:10]
 
-def clean_text(text):
-	"""
-	Normalizes text: lowercase, remove accents, keep only alphanumeric.
-	Returns 'unknown' if text is NA/None/NaN.
-	"""
-	if pd.isna(text) or str(text).lower() == "none" or str(text).lower() == "nan": 
-		return "unknown"
-	
-	text = str(text).lower()
-	# Normalize special chars (e.g. 'ü' -> 'u')
+
+def _ascii_lower(value):
+	"""Normalize a value to lowercase ASCII without failing on unusual text."""
+	text = str(value).lower()
 	try:
-		text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8')
-	except:
-		pass # Fallback if encoding fails
-	
-	# Remove non-alphanumeric chars
-	text = re.sub(r'[^a-z0-9]', '', text)
-	return text
+		return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+	except (TypeError, UnicodeError):
+		return text
+
+def clean_text(text):
+	"""Return a compact alphanumeric key, or ``unknown`` when text is missing."""
+	if pd.isna(text) or str(text).lower() in {"none", "nan"}:
+		return "unknown"
+	return re.sub(r"[^a-z0-9]", "", _ascii_lower(text)) or "unknown"
 
 def generate_hub_key(text):
-	"""
-	Creates a token-sorted, normalized key for Name Hubs.
-	Alphabetizes words so 'Martin Kauter' and 'Kauter Martin' produce the exact same key.
-	"""
-	if pd.isna(text) or str(text).lower() in ["none", "nan", ""]: 
+	"""Create the token-sorted key used to group orthographic name variants."""
+	if pd.isna(text) or str(text).lower() in {"none", "nan", ""}:
 		return "unknown"
-	
-	text = str(text).lower()
-	try:
-		text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8')
-	except:
-		pass
-	
-	# Split into words, remove non-alphanumeric, sort alphabetically, and join
-	words = text.split()
-	clean_words = [re.sub(r'[^a-z0-9]', '', w) for w in words]
+
+	words = _ascii_lower(text).split()
+	clean_words = [re.sub(r"[^a-z0-9]", "", word) for word in words]
 	clean_words = sorted([w for w in clean_words if w])
-	
 	return "".join(clean_words) if clean_words else "unknown"

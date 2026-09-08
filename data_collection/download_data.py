@@ -19,16 +19,23 @@ Default output structure:
             shab_data_09_2018.csv
 
 Environment variables:
-    SHAB_START_DATE   Start date in YYYY-MM-DD format. Default: 2018-09-02
-    SHAB_END_DATE     End date in YYYY-MM-DD format. Default: today
-    SHAB_OUTPUT_DIR   Output directory. Default: shab_data
-    SHAB_DELAY_SEC    Delay between API calls in seconds. Default: 1
+    SHAB_TERMS_ACCEPTED       Set to true after reviewing and accepting the
+                              current Official Gazettes Portal terms.
+    SHAB_TERMS_ACCEPTED_DATE  Acceptance date in YYYY-MM-DD format. The terms
+                              require consent to be renewed every 90 days.
+    SHAB_START_DATE           Start date in YYYY-MM-DD format. Default: 2018-09-02
+    SHAB_END_DATE             End date in YYYY-MM-DD format. Default: today
+    SHAB_OUTPUT_DIR           Output directory. Default: shab_data
+    SHAB_DELAY_SEC            Delay between API calls in seconds. Default: 1
+    SHAB_MAX_RETRIES          Retries after a failed API request. Default: 3
 """
 
 import datetime
+import hashlib
 import json
 import os
 import time
+from typing import Optional
 
 import pandas as pd
 import requests
@@ -37,7 +44,11 @@ from tqdm import tqdm
 
 
 SHAB_API_URL = "https://shab.ch/api/v1/publications"
+SHAB_PORTAL_URL = "https://www.shab.ch/"
+TERMS_RENEWAL_DAYS = 90
 
+SHAB_TERMS_ACCEPTED = os.getenv("SHAB_TERMS_ACCEPTED", "false")
+SHAB_TERMS_ACCEPTED_DATE = os.getenv("SHAB_TERMS_ACCEPTED_DATE", "")
 OVERALL_START_DATE = os.getenv("SHAB_START_DATE", "2018-09-02")
 OVERALL_END_DATE = os.getenv(
     "SHAB_END_DATE",
@@ -45,6 +56,42 @@ OVERALL_END_DATE = os.getenv(
 )
 BASE_DOWNLOAD_DIRECTORY = os.getenv("SHAB_OUTPUT_DIR", "shab_data")
 DELAY_SECONDS = float(os.getenv("SHAB_DELAY_SEC", "1"))
+MAX_RETRIES = max(0, int(os.getenv("SHAB_MAX_RETRIES", "3")))
+
+
+def validate_terms_confirmation(today: Optional[datetime.date] = None) -> None:
+    """Require a recent user confirmation before accessing the SHAB API.
+
+    This local check does not accept the terms on the user's behalf. Users must
+    review and accept the current terms through the Official Gazettes Portal,
+    then record the date through the environment variables documented above.
+    """
+    accepted_values = {"1", "true", "yes"}
+    if SHAB_TERMS_ACCEPTED.strip().lower() not in accepted_values:
+        raise RuntimeError(
+            "SHAB terms have not been confirmed. Review and accept the current "
+            f"Official Gazettes Portal terms at {SHAB_PORTAL_URL}, then set "
+            "SHAB_TERMS_ACCEPTED=true and SHAB_TERMS_ACCEPTED_DATE=YYYY-MM-DD."
+        )
+
+    try:
+        accepted_date = datetime.date.fromisoformat(SHAB_TERMS_ACCEPTED_DATE.strip())
+    except ValueError as exc:
+        raise RuntimeError(
+            "SHAB_TERMS_ACCEPTED_DATE must be a valid date in YYYY-MM-DD format."
+        ) from exc
+
+    current_date = today or datetime.date.today()
+    if accepted_date > current_date:
+        raise RuntimeError("SHAB_TERMS_ACCEPTED_DATE cannot be in the future.")
+
+    age_days = (current_date - accepted_date).days
+    if age_days > TERMS_RENEWAL_DAYS:
+        raise RuntimeError(
+            f"The recorded SHAB terms confirmation is {age_days} days old. "
+            f"Review the current terms at {SHAB_PORTAL_URL}, renew consent, and "
+            "update SHAB_TERMS_ACCEPTED_DATE before downloading data."
+        )
 
 
 def flatten_response_text_to_df(response_text: str) -> pd.DataFrame:
@@ -148,9 +195,32 @@ def fetch_week_page(week_start_str: str, week_end_str: str, page_num: int) -> st
         "rubrics": "AB,AW,AZ,BB,BH,EK,ES,FM,HR,KK,LS,NA,SB,SR,UP,UV",
         "searchPeriod": "CUSTOM",
     }
-    response = requests.get(SHAB_API_URL, params=params, timeout=30)
-    response.raise_for_status()
-    return response.text
+    headers = {"User-Agent": "AgenticGraphRAG-research-downloader/1.0"}
+    last_error = None
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            response = requests.get(
+                SHAB_API_URL,
+                params=params,
+                headers=headers,
+                timeout=30,
+            )
+            response.raise_for_status()
+            return response.text
+        except requests.exceptions.RequestException as exc:
+            last_error = exc
+            if attempt < MAX_RETRIES:
+                time.sleep(2 ** attempt)
+    raise last_error
+
+
+def response_has_publications(response_text: str) -> bool:
+    """Return whether an API page contains at least one publication."""
+    try:
+        content = json.loads(response_text).get("content", [])
+    except (json.JSONDecodeError, AttributeError):
+        return False
+    return isinstance(content, list) and bool(content)
 
 
 def save_monthly_csv(month_year: str, monthly_dataframes: list[pd.DataFrame], base_dir: str) -> None:
@@ -180,6 +250,8 @@ def download_shab_data() -> None:
     - flatten and collect the page content
     - aggregate the collected rows into one monthly CSV
     """
+    validate_terms_confirmation()
+
     print("--- Starting SHAB Data Download ---")
     print(f"Date Range: {OVERALL_START_DATE} to {OVERALL_END_DATE}")
     print(f"Saving data in: '{os.path.abspath(BASE_DOWNLOAD_DIRECTORY)}'")
@@ -191,6 +263,9 @@ def download_shab_data() -> None:
     except ValueError as exc:
         print(f"Error: invalid date format, expected YYYY-MM-DD. Details: {exc}")
         return
+
+    if start_date_obj > end_date:
+        raise ValueError("SHAB_START_DATE must be on or before SHAB_END_DATE.")
 
     os.makedirs(BASE_DOWNLOAD_DIRECTORY, exist_ok=True)
 
@@ -221,51 +296,66 @@ def download_shab_data() -> None:
             download_path = os.path.join(BASE_DOWNLOAD_DIRECTORY, current_month_year)
             os.makedirs(download_path, exist_ok=True)
 
-            for page_num in tqdm(
-                range(100),
+            page_num = 0
+            seen_page_hashes = set()
+            page_bar = tqdm(
                 desc=f"Pages for {week_start_str}",
                 position=1,
                 leave=False,
                 unit="page",
-            ):
-                file_name = f"data_{week_start_str}_to_{week_end_str}_page_{page_num}.json"
-                file_path = os.path.join(download_path, file_name)
+            )
+            try:
+                while True:
+                    file_name = f"data_{week_start_str}_to_{week_end_str}_page_{page_num}.json"
+                    file_path = os.path.join(download_path, file_name)
+                    response_text = None
 
-                # Reuse already-downloaded pages to make the script resumable.
-                if os.path.exists(file_path):
+                    # Reuse valid downloaded pages; retry corrupt cache files.
+                    if os.path.exists(file_path):
+                        try:
+                            with open(file_path, "r", encoding="utf-8") as handle:
+                                response_text = handle.read()
+                            json.loads(response_text)
+                        except (OSError, json.JSONDecodeError) as exc:
+                            tqdm.write(f"  - Page {page_num}: cached file is invalid; downloading it again ({exc}).")
+                            response_text = None
+
+                    if response_text is None:
+                        try:
+                            response_text = fetch_week_page(week_start_str, week_end_str, page_num)
+                            # Validate before replacing a corrupt or absent cache file.
+                            json.loads(response_text)
+                            with open(file_path, "w", encoding="utf-8") as handle:
+                                handle.write(response_text)
+                            time.sleep(DELAY_SECONDS)
+                        except (requests.exceptions.RequestException, json.JSONDecodeError) as exc:
+                            raise RuntimeError(
+                                f"Could not complete page {page_num} for "
+                                f"{week_start_str} to {week_end_str}. Rerun the "
+                                "downloader to resume from cached pages."
+                            ) from exc
+
+                    if not response_has_publications(response_text):
+                        break
+
+                    page_hash = hashlib.sha256(response_text.encode("utf-8")).hexdigest()
+                    if page_hash in seen_page_hashes:
+                        raise RuntimeError(
+                            f"SHAB API repeated page content for {week_start_str}; "
+                            "stopping to avoid an infinite pagination loop."
+                        )
+                    seen_page_hashes.add(page_hash)
+
                     try:
-                        with open(file_path, "r", encoding="utf-8") as handle:
-                            response_text = handle.read()
-
-                        if '"meta":' in response_text:
-                            df = flatten_response_text_to_df(response_text)
-                            if not df.empty:
-                                monthly_dataframes.append(df)
-                        else:
-                            break
-                    except Exception as exc:
-                        tqdm.write(f"  - Page {page_num}: could not read '{file_path}'. Error: {exc}")
-                    continue
-
-                try:
-                    response_text = fetch_week_page(week_start_str, week_end_str, page_num)
-
-                    with open(file_path, "w", encoding="utf-8") as handle:
-                        handle.write(response_text)
-
-                    if '"meta":' in response_text:
                         df = flatten_response_text_to_df(response_text)
                         if not df.empty:
                             monthly_dataframes.append(df)
-                    else:
-                        # No more valid pages for this weekly window.
-                        break
-
-                except requests.exceptions.RequestException as exc:
-                    tqdm.write(f"  - Page {page_num}: request failed: {exc}")
-                    break
-
-                time.sleep(DELAY_SECONDS)
+                    except Exception as exc:
+                        tqdm.write(f"  - Page {page_num}: could not read '{file_path}'. Error: {exc}")
+                    page_num += 1
+                    page_bar.update(1)
+            finally:
+                page_bar.close()
 
             current_date += datetime.timedelta(weeks=1)
             pbar.update(1)

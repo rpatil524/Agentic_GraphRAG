@@ -6,7 +6,8 @@ Compute a compact summary of evaluation outputs across Tier 1-4.
 Usage:
     python evaluation/compute_stats.py
 
-The script reads available JSON files in EVAL_OUTPUT_DIR (or ./evaluation by default)
+The script reads available JSON files in EVAL_OUTPUT_DIR (or
+./evaluation/results by default)
 and writes one consolidated file: evaluation_summary.json.
 """
 
@@ -65,4 +66,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

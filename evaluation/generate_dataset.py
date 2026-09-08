@@ -5,18 +5,21 @@ import random
 import asyncio
 import aiohttp
 from tqdm import tqdm
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase, READ_ACCESS
 
-from _bootstrap import output_dir
+from _bootstrap import REPO_ROOT
 
 # --- CONFIGURATION ---
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
+NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "shabdb")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-if not OPENAI_API_KEY:
-    print("WARNING: OPENAI_API_KEY not found in environment. Please supply it.")
+DATASET_MODEL = os.getenv("OPENAI_DATASET_MODEL", "gpt-5-2025-08-07")
+OUTPUT_PATH = os.getenv(
+    "AUTOMATED_DATASET_PATH",
+    str(REPO_ROOT / "evaluation" / "datasets" / "automated_dataset.json"),
+)
 
 def get_neo4j_session():
     if not NEO4J_PASSWORD:
@@ -25,7 +28,10 @@ def get_neo4j_session():
     return driver
 
 def run_cypher_query(driver, query, params=None):
-    with driver.session() as session:
+    with driver.session(
+        database=NEO4J_DATABASE,
+        default_access_mode=READ_ACCESS,
+    ) as session:
         result = session.run(query, params or {})
         return [r.data() for r in result]
 
@@ -60,7 +66,7 @@ async def generate_qa_pair_async(session, subgraph_json, question_type, sem):
     }
     
     payload = {
-        "model": "gpt-5",
+        "model": DATASET_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
@@ -182,76 +188,72 @@ async def process_subgraph(session, subgraph, q_type, tier, sem):
 
 async def main_async():
     if not OPENAI_API_KEY:
-        return
+        raise RuntimeError("OPENAI_API_KEY is required to generate benchmark questions.")
         
     driver = get_neo4j_session()
-    subgraphs = fetch_subgraphs(driver)
-    
-    if not subgraphs:
-        print("No subgraphs found. Is the database populated?")
-        return
-        
-    dataset = []
-    
-    tier_mapping = {
-        'Direct Property Extraction': 'Level 1',
-        'Multi-hop Corporate Connection': 'Level 2',
-        'NameHub Disambiguation': 'Level 2',
-        'Temporal Event Summary': 'Level 3'
-    }
-    
-    # Group subgraphs by tier
-    subgraphs_by_tier = {'Level 1': [], 'Level 2': [], 'Level 3': []}
-    random.shuffle(subgraphs)
-    for sub, q_type in subgraphs:
-        tier = tier_mapping.get(q_type, 'Level 1')
-        subgraphs_by_tier[tier].append((sub, q_type))
-        
-    print(f"Generating Golden Dataset (Target: 100 per Tier)...")
-    
-    # Reduce concurrency to 5 to avoid hammering the API
-    sem = asyncio.Semaphore(5)
-    
-    # GPT-5 is a reasoning model and takes significantly longer to respond than GPT-4o.
-    # Increase the timeout to 300 seconds (5 minutes) per request.
-    timeout = aiohttp.ClientTimeout(total=300)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        for tier in ['Level 1', 'Level 2', 'Level 3']:
-            print(f"Generating for {tier}...")
-            tier_dataset = []
-            
-            # Evaluate them in chunks of 50 until we get 100 successful responses
-            chunk_size = 50
-            index = 0
-            tier_subs = subgraphs_by_tier[tier]
-            
-            with tqdm(total=100, desc=tier) as pbar:
-                while len(tier_dataset) < 100:
-                    if index >= len(tier_subs):
-                        print(f"\nWarning: Exhausted all {len(tier_subs)} source subgraphs for {tier}. Only generated {len(tier_dataset)} pairs.")
-                        break
-                        
-                    chunk = tier_subs[index:index+chunk_size]
-                    index += chunk_size
-                    
-                    tasks = [process_subgraph(session, sub, q_type, tier, sem) for sub, q_type in chunk]
-                    for task in asyncio.as_completed(tasks):
-                        res = await task
-                        if res and len(tier_dataset) < 100:
-                            tier_dataset.append(res)
-                            res['question_id'] = f"Q{len(dataset) + len(tier_dataset):03d}"
-                            pbar.update(1)
-            
-            dataset.extend(tier_dataset)
-                
-    # Save the new real dataset
-    output_file = str(output_dir() / "datasets" / "automated_dataset.json")
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    with open(output_file, "w") as f:
-        json.dump(dataset, f, indent=4)
-        
-    print(f"\n✅ Created real Golden Dataset with {len(dataset)} questions at {output_file}")
-    driver.close()
+    try:
+        subgraphs = fetch_subgraphs(driver)
+        if not subgraphs:
+            raise RuntimeError("No source subgraphs were found. Is shabdb populated?")
+
+        dataset = []
+        tier_mapping = {
+            "Direct Property Extraction": "Level 1",
+            "Multi-hop Corporate Connection": "Level 2",
+            "NameHub Disambiguation": "Level 2",
+            "Temporal Event Summary": "Level 3",
+        }
+
+        subgraphs_by_tier = {"Level 1": [], "Level 2": [], "Level 3": []}
+        random.shuffle(subgraphs)
+        for subgraph, question_type in subgraphs:
+            tier = tier_mapping.get(question_type, "Level 1")
+            subgraphs_by_tier[tier].append((subgraph, question_type))
+
+        print("Generating automated benchmark (target: 100 questions per level)...")
+        sem = asyncio.Semaphore(5)
+        timeout = aiohttp.ClientTimeout(total=300)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            for tier in ["Level 1", "Level 2", "Level 3"]:
+                print(f"Generating for {tier}...")
+                tier_dataset = []
+                chunk_size = 50
+                index = 0
+                tier_subgraphs = subgraphs_by_tier[tier]
+
+                with tqdm(total=100, desc=tier) as progress:
+                    while len(tier_dataset) < 100:
+                        if index >= len(tier_subgraphs):
+                            print(
+                                f"\nWarning: exhausted {len(tier_subgraphs)} source "
+                                f"subgraphs for {tier}; generated {len(tier_dataset)} questions."
+                            )
+                            break
+
+                        chunk = tier_subgraphs[index : index + chunk_size]
+                        index += chunk_size
+                        tasks = [
+                            process_subgraph(session, subgraph, question_type, tier, sem)
+                            for subgraph, question_type in chunk
+                        ]
+                        for task in asyncio.as_completed(tasks):
+                            result = await task
+                            if result and len(tier_dataset) < 100:
+                                tier_dataset.append(result)
+                                result["question_id"] = (
+                                    f"Q{len(dataset) + len(tier_dataset):03d}"
+                                )
+                                progress.update(1)
+
+                dataset.extend(tier_dataset)
+
+        os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+        with open(OUTPUT_PATH, "w", encoding="utf-8") as output_file:
+            json.dump(dataset, output_file, indent=2, ensure_ascii=False)
+
+        print(f"\nCreated automated benchmark with {len(dataset)} questions at {OUTPUT_PATH}")
+    finally:
+        driver.close()
 
 def main():
     asyncio.run(main_async())

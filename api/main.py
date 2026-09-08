@@ -1,17 +1,28 @@
+"""FastAPI endpoints used by the human-in-the-loop dashboard."""
+
+import logging
+import os
+from typing import Any, Dict, List, Optional
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+
 from api.database import db
 
-app = FastAPI(title="SHAB Risk Radar API")
+LOGGER = logging.getLogger(__name__)
+app = FastAPI(title="Agentic GraphRAG API")
 
 ACTIVE_TRACES = {}
 
-# Enable CORS for frontend
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -20,6 +31,12 @@ app.add_middleware(
 @app.on_event("shutdown")
 def shutdown_event():
     db.close()
+
+
+@app.get("/health")
+def health():
+    """Return a lightweight service-health response."""
+    return {"status": "ok"}
 
 @app.get("/api/search")
 def search(term: str):
@@ -46,7 +63,7 @@ def search(term: str):
 def get_entity_details(uid: str):
     q_details = """
     MATCH (n:BaseNode {uid: $uid})
-    RETURN n.city AS City, n.risk_rank AS Risk, n.community_id AS Community, 
+    RETURN n.name AS name, n.city AS City, n.risk_rank AS Risk, n.community_id AS Community,
            n.address AS address, n.legal_form AS legal_form, n.deletion_date AS deletion_date, 
            n.purpose AS purpose, n.capital_nominal AS capital_nominal, 
            n.capital_paid AS capital_paid, n.is_weak AS is_weak, n.source AS source
@@ -92,12 +109,13 @@ def get_entity_people(uid: str):
 def get_entity_events(uid: str):
     q_events = """
     MATCH (n:BaseNode {uid: $uid})
-    OPTIONAL MATCH (n)-[:HAS_EVENT|ACTED_IN]-(direct_e:Event)
-    OPTIONAL MATCH (n)-[:HAS_NAME]-(:BaseNode)-[:HAS_EVENT|ACTED_IN]-(indirect_e:Event)
-    
-    WITH coalesce(direct_e, indirect_e) AS e
+    OPTIONAL MATCH (n)-[]-(direct_e:Event)
+    WITH n, collect(DISTINCT direct_e) AS direct_events
+    OPTIONAL MATCH (n)-[:HAS_NAME]-(:NameHub)-[:HAS_NAME]-(alias:BaseNode)-[]-(indirect_e:Event)
+    WITH direct_events + collect(DISTINCT indirect_e) AS events
+    UNWIND events AS e
     WHERE e IS NOT NULL
-    RETURN e.date AS Date, e.rubric AS Rubric, e.text AS Text, e.uid AS ID
+    RETURN DISTINCT e.date AS Date, e.rubric AS Rubric, e.text AS Text, e.uid AS ID
     ORDER BY e.date DESC LIMIT 50
     """
     events = db.run_query(q_events, {'uid': uid})
@@ -132,10 +150,11 @@ def chat(payload: ChatRequest):
         if trace_id in ACTIVE_TRACES:
             del ACTIVE_TRACES[trace_id]
         return {"result": result}
-    except Exception as e:
+    except Exception as exc:
         if trace_id in ACTIVE_TRACES:
             del ACTIVE_TRACES[trace_id]
-        raise HTTPException(status_code=500, detail=str(e))
+        LOGGER.exception("Agent request failed", exc_info=exc)
+        raise HTTPException(status_code=500, detail="Agent request failed.") from exc
 
 @app.get("/api/chat/trace/{trace_id}")
 def get_trace(trace_id: str):
@@ -231,4 +250,3 @@ def get_entity_graph(uid: str):
         "nodes": list(nodes_map.values()),
         "links": unique_links
     }
-
